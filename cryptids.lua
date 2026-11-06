@@ -3,7 +3,6 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local Camera = Workspace.CurrentCamera
 local LP = Players.LocalPlayer
@@ -13,7 +12,7 @@ local Cfg = {
     MinD = 0, MaxD = 5000,
     ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
-    ThickTracer = 1, ThickBox = 1, SizeText = 14,
+    ThickTracer = 1, ThickBox = 1, SizeText = 14, BoxScale = 1,
     RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false
 }
 
@@ -219,7 +218,8 @@ track(RunService.RenderStepped:Connect(function()
                 end
 
                 if Cfg.Boxes then
-                    local h = (Camera.ViewportSize.Y / dist) * 3
+                    local baseH = (Camera.ViewportSize.Y / dist) * 3
+                    local h = baseH * Cfg.BoxScale
                     local w = h / 2
                     d.bx.Size = Vector2.new(w, h)
                     d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
@@ -362,9 +362,10 @@ UIRefs.ColTracer = S3:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTra
 UIRefs.ColBox = S3:Colorpicker({ Title = "Box Color", Default = Cfg.ColBox, Callback = function(c) Cfg.ColBox = c end })
 UIRefs.ColText = S3:Colorpicker({ Title = "Text Color", Default = Cfg.ColText, Callback = function(c) Cfg.ColText = c end })
 
-UIRefs.ThickTracer = S3:Slider({ Title = "Tracer Thickness", Value = { Min = 1, Max = 5, Default = 1 }, Callback = function(v) Cfg.ThickTracer = v end })
-UIRefs.ThickBox = S3:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 5, Default = 1 }, Callback = function(v) Cfg.ThickBox = v end })
-UIRefs.SizeText = S3:Slider({ Title = "Text Size", Value = { Min = 10, Max = 24, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
+UIRefs.ThickTracer = S3:Slider({ Title = "Tracer Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickTracer = v end })
+UIRefs.ThickBox = S3:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickBox = v end })
+UIRefs.SizeText = S3:Slider({ Title = "Text Size", Value = { Min = 1, Max = 50, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
+UIRefs.BoxScale = S3:Slider({ Title = "Box Scale", Value = { Min = 0.1, Max = 5, Default = 1 }, Callback = function(v) Cfg.BoxScale = v end })
 
 local S4 = T1:Section({ Title = "Rainbow" })
 
