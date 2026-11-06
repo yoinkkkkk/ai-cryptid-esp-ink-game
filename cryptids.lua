@@ -3,152 +3,184 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = Workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
-local Config = {
-    ESP = false,
-    Tracers = false,
-    Boxes = false,
-    Chams = false,
-    Names = false,
-    Distance = false,
-    MinDist = 0,
-    MaxDist = 5000,
-    TracerColor = Color3.fromRGB(170, 0, 255),
-    BoxColor = Color3.fromRGB(170, 0, 255),
-    ChamsColor = Color3.fromRGB(170, 0, 255),
-    TextColor = Color3.fromRGB(220, 150, 255),
-    TracerThickness = 1,
-    BoxThickness = 1,
-    TextSize = 14,
-    -- Rainbow settings
-    RainbowChams = false,
-    RainbowTracers = false,
-    RainbowBoxes = false,
-    RainbowText = false,
+local Cfg = {
+    ESP = false, Chams = false, Tracers = false, Boxes = false, Names = false, Dist = false,
+    MinD = 0, MaxD = 5000,
+    ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
+    ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
+    ThickTracer = 1, ThickBox = 1, SizeText = 14,
+    RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
+    AutoPhoto = false
 }
 
-local tracked = {}
+local Objs = {}
+local UIRefs = {}
 
-local function getRainbowColor()
+local function getRainbow()
     return Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
 end
 
-local function isCryptid(obj)
-    if not obj or (not obj:IsA("Model") and not obj:IsA("BasePart")) then return false end
-    return string.find(string.lower(obj.Name), "cryptid", 1, true) ~= nil
-end
-
-local function getRootPart(obj)
+local function getRoot(obj)
     if obj:IsA("BasePart") then return obj end
     return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart
 end
 
-local function createESP(model)
-    if tracked[model] then return end
-    local root = getRootPart(model)
+local function setup(obj)
+    if Objs[obj] then return end
+    local root = getRoot(obj)
     if not root then return end
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CryptidESP_HL"
-    highlight.FillColor = Config.ChamsColor
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = Config.ChamsColor
-    highlight.OutlineTransparency = 0
-    highlight.Adornee = model
-    highlight.Enabled = Config.Chams
-    highlight.Parent = model
+    local hl = Instance.new("Highlight")
+    hl.FillColor = Cfg.ColChams
+    hl.FillTransparency = 0.5
+    hl.OutlineColor = Cfg.ColChams
+    hl.OutlineTransparency = 0
+    hl.Adornee = obj
+    hl.Enabled = Cfg.Chams
+    hl.Parent = obj
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CryptidESP_BB"
-    billboard.Size = UDim2.fromOffset(200, 40)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
-    billboard.MaxDistance = math.huge
-    billboard.Adornee = root
-    billboard.Enabled = Config.Names or Config.Distance
-    billboard.Parent = model
+    local bb = Instance.new("BillboardGui")
+    bb.Size = UDim2.fromOffset(200, 40)
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = math.huge
+    bb.Adornee = root
+    bb.Enabled = Cfg.Names or Cfg.Dist
+    bb.Parent = obj
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = Config.TextSize
-    label.TextColor3 = Config.TextColor
-    label.TextStrokeTransparency = 0.4
-    label.TextStrokeColor3 = Color3.new(0, 0, 0)
-    label.Text = ""
-    label.Parent = billboard
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.fromScale(1, 1)
+    txt.BackgroundTransparency = 1
+    txt.Font = Enum.Font.GothamBold
+    txt.TextSize = Cfg.SizeText
+    txt.TextColor3 = Cfg.ColText
+    txt.TextStrokeTransparency = 0.4
+    txt.TextStrokeColor3 = Color3.new(0, 0, 0)
+    txt.Parent = bb
 
-    local tracer = Drawing.new("Line")
-    tracer.Color = Config.TracerColor
-    tracer.Thickness = Config.TracerThickness
-    tracer.Transparency = 1
-    tracer.Visible = false
+    local tr = Drawing.new("Line")
+    tr.Color = Cfg.ColTracer
+    tr.Thickness = Cfg.ThickTracer
+    tr.Transparency = 1
+    tr.Visible = false
 
-    local box = Drawing.new("Square")
-    box.Color = Config.BoxColor
-    box.Thickness = Config.BoxThickness
-    box.Filled = false
-    box.Transparency = 1
-    box.Visible = false
+    local bx = Drawing.new("Square")
+    bx.Color = Cfg.ColBox
+    bx.Thickness = Cfg.ThickBox
+    bx.Filled = false
+    bx.Transparency = 1
+    bx.Visible = false
 
-    tracked[model] = {
-        highlight = highlight,
-        billboard = billboard,
-        label = label,
-        tracer = tracer,
-        box = box,
-        root = root
-    }
+    Objs[obj] = { hl = hl, bb = bb, txt = txt, tr = tr, bx = bx, root = root }
 end
 
-local function removeESP(model)
-    local data = tracked[model]
-    if not data then return end
-    if data.highlight then data.highlight:Destroy() end
-    if data.billboard then data.billboard:Destroy() end
-    if data.tracer then data.tracer:Remove() end
-    if data.box then data.box:Remove() end
-    tracked[model] = nil
+local function cleanup(obj)
+    local d = Objs[obj]
+    if not d then return end
+    if d.hl then d.hl:Destroy() end
+    if d.bb then d.bb:Destroy() end
+    if d.tr then d.tr:Remove() end
+    if d.bx then d.bx:Remove() end
+    Objs[obj] = nil
 end
 
-local function initialScan()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if isCryptid(obj) then
-            createESP(obj)
-        end
+local function checkName(n)
+    return string.find(string.lower(n), "cryptid", 1, true) ~= nil
+end
+
+for _, v in pairs(Workspace:GetDescendants()) do
+    if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) then
+        setup(v)
     end
 end
 
-Workspace.DescendantAdded:Connect(function(obj)
-    if isCryptid(obj) then
+Workspace.DescendantAdded:Connect(function(v)
+    if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) then
         task.defer(function()
-            if obj and obj.Parent then
-                createESP(obj)
-            end
+            if v and v.Parent then setup(v) end
         end)
     end
 end)
 
 task.spawn(function()
     while task.wait(1) do
-        for model, data in pairs(tracked) do
-            if not model.Parent or not data.root or not data.root.Parent then
-                removeESP(model)
+        for obj, d in pairs(Objs) do
+            if not obj.Parent or not d.root or not d.root.Parent then
+                cleanup(obj)
             end
         end
     end
 end)
 
-local function updateVisuals()
-    if not Config.ESP then
-        for _, data in pairs(tracked) do
-            if data.tracer then data.tracer.Visible = false end
-            if data.box then data.box.Visible = false end
-            if data.billboard then data.billboard.Enabled = false end
-            if data.highlight then data.highlight.Enabled = false end
+local function getNearestCryptid()
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local nearest, dist = nil, math.huge
+    for obj, data in pairs(Objs) do
+        if data.root and data.root.Parent then
+            local d = (hrp.Position - data.root.Position).Magnitude
+            if d < dist then
+                dist = d
+                nearest = obj
+            end
+        end
+    end
+    return nearest, dist
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if Cfg.AutoPhoto then
+            local target = getNearestCryptid()
+            if target then
+                local camTool = nil
+                local char = LP.Character
+                local bp = LP:FindFirstChild("Backpack")
+                if char then
+                    for _, t in ipairs(char:GetChildren()) do
+                        if t:IsA("Tool") and string.find(string.lower(t.Name), "camera") then camTool = t end
+                    end
+                end
+                if not camTool and bp then
+                    for _, t in ipairs(bp:GetChildren()) do
+                        if t:IsA("Tool") and string.find(string.lower(t.Name), "camera") then camTool = t end
+                    end
+                end
+                if camTool then
+                    if camTool.Parent ~= char then
+                        local hum = char and char:FindFirstChildOfClass("Humanoid")
+                        if hum then hum:EquipTool(camTool) task.wait(0.1) end
+                    end
+                    local root = getRoot(target)
+                    if root then
+                        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, root.Position)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                        task.wait(0.05)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 1)
+                        task.wait(0.05)
+                        VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 1)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not Cfg.ESP then
+        for _, d in pairs(Objs) do
+            if d.tr then d.tr.Visible = false end
+            if d.bx then d.bx.Visible = false end
+            if d.bb then d.bb.Enabled = false end
+            if d.hl then d.hl.Enabled = false end
         end
         return
     end
@@ -157,216 +189,193 @@ local function updateVisuals()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    local rColor = getRainbowColor()
+    local rbw = getRainbow()
 
-    for model, data in pairs(tracked) do
-        local root = data.root
+    for obj, d in pairs(Objs) do
+        local root = d.root
         if not root or not root.Parent then
-            removeESP(model)
+            cleanup(obj)
             continue
         end
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local sp, onScr = Camera:WorldToViewportPoint(root.Position)
         local dist = math.floor((hrp.Position - root.Position).Magnitude)
 
-        if onScreen and dist >= Config.MinDist and dist <= Config.MaxDist then
-            local textStr = ""
-            if Config.Names then textStr = model.Name end
-            if Config.Distance then
-                if textStr ~= "" then textStr = textStr .. " " end
-                textStr = textStr .. "[" .. dist .. "]"
+        if onScr and dist >= Cfg.MinD and dist <= Cfg.MaxD then
+            local tStr = ""
+            if Cfg.Names then tStr = obj.Name end
+            if Cfg.Dist then
+                if tStr ~= "" then tStr = tStr .. " " end
+                tStr = tStr .. "[" .. dist .. "]"
             end
 
-            if textStr ~= "" then
-                data.billboard.Enabled = true
-                data.label.Text = textStr
-                data.label.TextColor3 = Config.RainbowText and rColor or Config.TextColor
-                data.label.TextSize = Config.TextSize
+            if tStr ~= "" then
+                d.bb.Enabled = true
+                d.txt.Text = tStr
+                d.txt.TextColor3 = Cfg.RbwText and rbw or Cfg.ColText
+                d.txt.TextSize = Cfg.SizeText
             else
-                data.billboard.Enabled = false
+                d.bb.Enabled = false
             end
 
-            if Config.Chams then
-                data.highlight.Enabled = true
-                local cColor = Config.RainbowChams and rColor or Config.ChamsColor
-                data.highlight.FillColor = cColor
-                data.highlight.OutlineColor = cColor
+            if Cfg.Chams then
+                d.hl.Enabled = true
+                local cc = Cfg.RbwChams and rbw or Cfg.ColChams
+                d.hl.FillColor = cc
+                d.hl.OutlineColor = cc
             else
-                data.highlight.Enabled = false
+                d.hl.Enabled = false
             end
 
-            if Config.Tracers then
-                data.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                data.tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                data.tracer.Color = Config.RainbowTracers and rColor or Config.TracerColor
-                data.tracer.Thickness = Config.TracerThickness
-                data.tracer.Visible = true
+            if Cfg.Tracers then
+                d.tr.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                d.tr.To = Vector2.new(sp.X, sp.Y)
+                d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
+                d.tr.Thickness = Cfg.ThickTracer
+                d.tr.Visible = true
             else
-                data.tracer.Visible = false
+                d.tr.Visible = false
             end
 
-            if Config.Boxes then
-                local height = (Camera.ViewportSize.Y / dist) * 3
-                local width = height / 2
-                data.box.Size = Vector2.new(width, height)
-                data.box.Position = Vector2.new(screenPos.X - width / 2, screenPos.Y - height / 2)
-                data.box.Color = Config.RainbowBoxes and rColor or Config.BoxColor
-                data.box.Thickness = Config.BoxThickness
-                data.box.Visible = true
+            if Cfg.Boxes then
+                local h = (Camera.ViewportSize.Y / dist) * 3
+                local w = h / 2
+                d.bx.Size = Vector2.new(w, h)
+                d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
+                d.bx.Color = Cfg.RbwBoxes and rbw or Cfg.ColBox
+                d.bx.Thickness = Cfg.ThickBox
+                d.bx.Visible = true
             else
-                data.box.Visible = false
+                d.bx.Visible = false
             end
         else
-            data.tracer.Visible = false
-            data.box.Visible = false
-            data.billboard.Enabled = false
-            data.highlight.Enabled = false
+            d.tr.Visible = false
+            d.bx.Visible = false
+            d.bb.Enabled = false
+            d.hl.Enabled = false
         end
     end
-end
+end)
 
-RunService.RenderStepped:Connect(updateVisuals)
-
-local Window = WindUI:CreateWindow({
+local Win = WindUI:CreateWindow({
     Title = "Ink Game",
     Icon = "eye",
     Theme = "Dark",
-    Size = UDim2.fromOffset(500, 450),
+    Size = UDim2.fromOffset(520, 480),
     OpenButton = {
-        Title = "Cryptid ESP",
+        Title = "C R Y P T I D",
         CornerRadius = UDim.new(1, 0),
-        OutlineThickness = 3, -- Толстая обводка
-        OutlineColor = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1)), -- Белая
-        RainbowOutline = true, -- Если WindUI поддерживает из коробки
+        OutlineThickness = 3,
+        OutlineColor = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1)),
+        RainbowOutline = true,
         Enabled = true,
     }
 })
 
-local Tab = Window:Tab({ Title = "Visuals", Icon = "eye" })
-local ESPGroup = Tab:Section({ Title = "ESP Options" })
+local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
+local S1 = T1:Section({ Title = "Main" })
 
-ESPGroup:Toggle({
-    Title = "Master ESP",
-    Value = false,
-    Callback = function(state) Config.ESP = state end
+UIRefs.ESP = S1:Toggle({ Title = "Master ESP", Value = false, Callback = function(v) Cfg.ESP = v end })
+UIRefs.Chams = S1:Toggle({ Title = "Chams", Value = false, Callback = function(v) Cfg.Chams = v end })
+UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = function(v) Cfg.Tracers = v end })
+UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
+UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
+UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
+
+local S2 = T1:Section({ Title = "Filters" })
+
+UIRefs.MinD = S2:Slider({ Title = "Min Distance", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
+UIRefs.MaxD = S2:Slider({ Title = "Max Distance", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
+
+local S3 = T1:Section({ Title = "Colors" })
+
+UIRefs.ColChams = S3:Colorpicker({ Title = "Chams Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
+UIRefs.ColTracer = S3:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTracer, Callback = function(c) Cfg.ColTracer = c end })
+UIRefs.ColBox = S3:Colorpicker({ Title = "Box Color", Default = Cfg.ColBox, Callback = function(c) Cfg.ColBox = c end })
+UIRefs.ColText = S3:Colorpicker({ Title = "Text Color", Default = Cfg.ColText, Callback = function(c) Cfg.ColText = c end })
+
+UIRefs.ThickTracer = S3:Slider({ Title = "Tracer Thickness", Value = { Min = 1, Max = 5, Default = 1 }, Callback = function(v) Cfg.ThickTracer = v end })
+UIRefs.ThickBox = S3:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 5, Default = 1 }, Callback = function(v) Cfg.ThickBox = v end })
+UIRefs.SizeText = S3:Slider({ Title = "Text Size", Value = { Min = 10, Max = 24, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
+
+local S4 = T1:Section({ Title = "Rainbow" })
+
+UIRefs.RbwChams = S4:Toggle({ Title = "Rainbow Chams", Value = false, Callback = function(v) Cfg.RbwChams = v end })
+UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callback = function(v) Cfg.RbwTracers = v end })
+UIRefs.RbwBoxes = S4:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
+UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
+
+local T2 = Win:Tab({ Title = "Utility", Icon = "crosshair" })
+local S5 = T2:Section({ Title = "Actions" })
+
+S5:Button({
+    Title = "Teleport to Nearest",
+    Callback = function()
+        local target = getNearestCryptid()
+        if target then
+            local root = getRoot(target)
+            local char = LP.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if root and hrp then
+                hrp.CFrame = CFrame.new(root.Position + Vector3.new(0, 5, 5))
+            end
+        end
+    end
 })
 
-ESPGroup:Toggle({
-    Title = "Chams",
-    Value = false,
-    Callback = function(state) Config.Chams = state end
+UIRefs.AutoPhoto = S5:Toggle({ Title = "Auto Photo", Value = false, Callback = function(v) Cfg.AutoPhoto = v end })
+
+local T3 = Win:Tab({ Title = "Configs", Icon = "save" })
+local S6 = T3:Section({ Title = "Config Manager" })
+
+local NameBox = S6:Input({ Title = "Config Name", Value = "default", Placeholder = "Name..." })
+
+S6:Button({
+    Title = "Save",
+    Callback = function()
+        local n = NameBox.Value
+        if n == "" then n = "default" end
+        local d = {}
+        for k, v in pairs(Cfg) do
+            if typeof(v) == "Color3" then
+                d[k] = {v.R, v.G, v.B}
+            else
+                d[k] = v
+            end
+        end
+        if writefile then
+            if not isfolder("CryptidCfg") then makefolder("CryptidCfg") end
+            writefile("CryptidCfg/" .. n .. ".json", game:GetService("HttpService"):JSONEncode(d))
+            Win:Notify({ Title = "Saved", Content = n, Duration = 2 })
+        end
+    end
 })
 
-ESPGroup:Toggle({
-    Title = "Tracers",
-    Value = false,
-    Callback = function(state) Config.Tracers = state end
+S6:Button({
+    Title = "Load",
+    Callback = function()
+        local n = NameBox.Value
+        if n == "" then n = "default" end
+        local p = "CryptidCfg/" .. n .. ".json"
+        if isfile and isfile(p) then
+            local s, d = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(readfile(p))
+            end)
+            if s and d then
+                for k, v in pairs(d) do
+                    if type(v) == "table" and #v == 3 then
+                        Cfg[k] = Color3.new(v[1], v[2], v[3])
+                    else
+                        Cfg[k] = v
+                    end
+                end
+                for k, v in pairs(Cfg) do
+                    if UIRefs[k] and UIRefs[k].Set then
+                        pcall(function() UIRefs[k]:Set(v) end)
+                    end
+                end
+                Win:Notify({ Title = "Loaded", Content = n, Duration = 2 })
+            end
+        end
+    end
 })
-
-ESPGroup:Toggle({
-    Title = "Boxes",
-    Value = false,
-    Callback = function(state) Config.Boxes = state end
-})
-
-ESPGroup:Toggle({
-    Title = "Names",
-    Value = false,
-    Callback = function(state) Config.Names = state end
-})
-
-ESPGroup:Toggle({
-    Title = "Distance",
-    Value = false,
-    Callback = function(state) Config.Distance = state end
-})
-
-local DistGroup = Tab:Section({ Title = "Distance Filter" })
-
-DistGroup:Slider({
-    Title = "Min Distance",
-    Value = { Min = 0, Max = 5000, Default = 0 },
-    Callback = function(value) Config.MinDist = value end
-})
-
-DistGroup:Slider({
-    Title = "Max Distance",
-    Value = { Min = 0, Max = 5000, Default = 5000 },
-    Callback = function(value) Config.MaxDist = value end
-})
-
-local StyleGroup = Tab:Section({ Title = "Colors & Thickness" })
-
-StyleGroup:Colorpicker({
-    Title = "Chams Color",
-    Default = Config.ChamsColor,
-    Callback = function(color) Config.ChamsColor = color end
-})
-
-StyleGroup:Colorpicker({
-    Title = "Tracer Color",
-    Default = Config.TracerColor,
-    Callback = function(color) Config.TracerColor = color end
-})
-
-StyleGroup:Colorpicker({
-    Title = "Box Color",
-    Default = Config.BoxColor,
-    Callback = function(color) Config.BoxColor = color end
-})
-
-StyleGroup:Colorpicker({
-    Title = "Text Color",
-    Default = Config.TextColor,
-    Callback = function(color) Config.TextColor = color end
-})
-
-StyleGroup:Slider({
-    Title = "Tracer Thickness",
-    Value = { Min = 1, Max = 5, Default = Config.TracerThickness },
-    Callback = function(value) Config.TracerThickness = value end
-})
-
-StyleGroup:Slider({
-    Title = "Box Thickness",
-    Value = { Min = 1, Max = 5, Default = Config.BoxThickness },
-    Callback = function(value) Config.BoxThickness = value end
-})
-
-StyleGroup:Slider({
-    Title = "Text Size",
-    Value = { Min = 10, Max = 24, Default = Config.TextSize },
-    Callback = function(value) Config.TextSize = value end
-})
-
-local RainbowGroup = Tab:Section({ Title = "Rainbow Options" })
-
-RainbowGroup:Toggle({
-    Title = "Rainbow Chams",
-    Value = false,
-    Callback = function(state) Config.RainbowChams = state end
-})
-
-RainbowGroup:Toggle({
-    Title = "Rainbow Tracers",
-    Value = false,
-    Callback = function(state) Config.RainbowTracers = state end
-})
-
-RainbowGroup:Toggle({
-    Title = "Rainbow Boxes",
-    Value = false,
-    Callback = function(state) Config.RainbowBoxes = state end
-})
-
-RainbowGroup:Toggle({
-    Title = "Rainbow Text",
-    Value = false,
-    Callback = function(state) Config.RainbowText = state end
-})
-
--- Встроенный конфиг-менеджер WindUI
-local ConfigManager = Window:ConfigManager()
-ConfigManager:Init("Cryptid_ESP_Config")
-
-initialScan()
