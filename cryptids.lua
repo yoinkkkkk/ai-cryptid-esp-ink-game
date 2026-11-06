@@ -17,7 +17,8 @@ local Cfg = {
     ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14, BoxScale = 1,
-    RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false
+    RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
+    ToggleKey = Enum.KeyCode.RightShift
 }
 
 local Objs = {}
@@ -314,7 +315,7 @@ local Win = WindUI:CreateWindow({
     Icon = "eye",
     Theme = "Dark",
     Size = UDim2.fromOffset(520, 520),
-    ToggleKey = Enum.KeyCode.RightShift,
+    ToggleKey = Cfg.ToggleKey,
     OpenButton = {
         Title = "cryptids esp inkk",
         CornerRadius = UDim.new(1, 0),
@@ -345,9 +346,11 @@ local function toggleWindow()
 end
 
 UIS.InputBegan:Connect(function(input, gp)
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        if not gp or (UIS:GetFocusedTextBox() == nil) then
-            toggleWindow()
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Cfg.ToggleKey then
+            if not gp or (UIS:GetFocusedTextBox() == nil) then
+                toggleWindow()
+            end
         end
     end
 end)
@@ -368,6 +371,8 @@ local function saveCfgTo(name)
     for k, v in pairs(Cfg) do
         if typeof(v) == "Color3" then
             d[k] = {v.R, v.G, v.B}
+        elseif typeof(v) == "EnumItem" then
+            d[k] = v.Name
         else
             d[k] = v
         end
@@ -387,13 +392,20 @@ local function loadCfgFrom(name)
     for k, v in pairs(d) do
         if type(v) == "table" and #v == 3 then
             Cfg[k] = Color3.new(v[1], v[2], v[3])
+        elseif k == "ToggleKey" and type(v) == "string" then
+            local ok, kc = pcall(function() return Enum.KeyCode[v] end)
+            if ok and kc then Cfg[k] = kc end
         else
             Cfg[k] = v
         end
     end
     for k, v in pairs(Cfg) do
         if UIRefs[k] and UIRefs[k].Set then
-            pcall(function() UIRefs[k]:Set(v) end)
+            if k == "ToggleKey" then
+                UIRefs[k]:Set(v.Name)
+            else
+                UIRefs[k]:Set(v)
+            end
         end
     end
     return true
@@ -430,49 +442,64 @@ local function getConfigList()
 end
 
 local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
-local S1 = T1:Section({ Title = "ESP Options" })
+local S1 = T1:Section({ Title = "Keybinds" })
 
-UIRefs.ESP = S1:Toggle({ Title = "Enable Master ESP (Text/Boxes)", Value = false, Callback = function(v) Cfg.ESP = v end })
-UIRefs.Chams = S1:Toggle({ Title = "Enable Chams (Highlight)", Value = false, Callback = function(v) Cfg.Chams = v end })
-UIRefs.Tracers = S1:Toggle({ Title = "Enable Tracers (Lines)", Value = false, Callback = function(v) Cfg.Tracers = v end })
-UIRefs.Boxes = S1:Toggle({ Title = "Show 2D Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
-UIRefs.Names = S1:Toggle({ Title = "Show Name", Value = false, Callback = function(v) Cfg.Names = v end })
-UIRefs.Dist = S1:Toggle({ Title = "Show Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
+UIRefs.ToggleKey = S1:Keybind({
+    Title = "Toggle Menu Key",
+    Default = "RightShift",
+    Callback = function(key)
+        if typeof(key) == "EnumItem" then
+            Cfg.ToggleKey = key
+        elseif typeof(key) == "string" then
+            local ok, kc = pcall(function() return Enum.KeyCode[key] end)
+            if ok and kc then Cfg.ToggleKey = kc end
+        end
+    end
+})
 
-local S2 = T1:Section({ Title = "Distance Filters" })
+local S2 = T1:Section({ Title = "ESP Options" })
 
-UIRefs.MinD = S2:Slider({ Title = "Min Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
-UIRefs.MaxD = S2:Slider({ Title = "Max Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
+UIRefs.ESP = S2:Toggle({ Title = "Enable Master ESP (Text/Boxes)", Value = false, Callback = function(v) Cfg.ESP = v end })
+UIRefs.Chams = S2:Toggle({ Title = "Enable Chams (Highlight)", Value = false, Callback = function(v) Cfg.Chams = v end })
+UIRefs.Tracers = S2:Toggle({ Title = "Enable Tracers (Lines)", Value = false, Callback = function(v) Cfg.Tracers = v end })
+UIRefs.Boxes = S2:Toggle({ Title = "Show 2D Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
+UIRefs.Names = S2:Toggle({ Title = "Show Name", Value = false, Callback = function(v) Cfg.Names = v end })
+UIRefs.Dist = S2:Toggle({ Title = "Show Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
 
-local S3 = T1:Section({ Title = "Colors & Sizes" })
+local S3 = T1:Section({ Title = "Distance Filters" })
 
-UIRefs.ColChams = S3:Colorpicker({ Title = "Chams Fill Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
-UIRefs.ColChamsOutline = S3:Colorpicker({ Title = "Chams Outline Color", Default = Cfg.ColChamsOutline, Callback = function(c) Cfg.ColChamsOutline = c end })
-UIRefs.ChamsOutlineTransparency = S3:Slider({ Title = "Chams Outline Transparency", Value = { Min = 0, Max = 1, Default = 0 }, Callback = function(v) Cfg.ChamsOutlineTransparency = v end })
+UIRefs.MinD = S3:Slider({ Title = "Min Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
+UIRefs.MaxD = S3:Slider({ Title = "Max Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
 
-UIRefs.ColTracer = S3:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTracer, Callback = function(c) Cfg.ColTracer = c end })
-UIRefs.ColBox = S3:Colorpicker({ Title = "Box Color", Default = Cfg.ColBox, Callback = function(c) Cfg.ColBox = c end })
-UIRefs.ColText = S3:Colorpicker({ Title = "Text Color", Default = Cfg.ColText, Callback = function(c) Cfg.ColText = c end })
+local S4 = T1:Section({ Title = "Colors & Sizes" })
 
-UIRefs.ThickTracer = S3:Slider({ Title = "Tracer Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickTracer = v end })
-UIRefs.ThickBox = S3:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickBox = v end })
-UIRefs.SizeText = S3:Slider({ Title = "Text Size", Value = { Min = 1, Max = 50, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
-UIRefs.BoxScale = S3:Slider({ Title = "Box Scale", Value = { Min = 0.1, Max = 5, Default = 1 }, Callback = function(v) Cfg.BoxScale = v end })
+UIRefs.ColChams = S4:Colorpicker({ Title = "Chams Fill Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
+UIRefs.ColChamsOutline = S4:Colorpicker({ Title = "Chams Outline Color", Default = Cfg.ColChamsOutline, Callback = function(c) Cfg.ColChamsOutline = c end })
+UIRefs.ChamsOutlineTransparency = S4:Slider({ Title = "Chams Outline Transparency", Value = { Min = 0, Max = 1, Default = 0 }, Callback = function(v) Cfg.ChamsOutlineTransparency = v end })
 
-local S4 = T1:Section({ Title = "Rainbow Effects" })
+UIRefs.ColTracer = S4:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTracer, Callback = function(c) Cfg.ColTracer = c end })
+UIRefs.ColBox = S4:Colorpicker({ Title = "Box Color", Default = Cfg.ColBox, Callback = function(c) Cfg.ColBox = c end })
+UIRefs.ColText = S4:Colorpicker({ Title = "Text Color", Default = Cfg.ColText, Callback = function(c) Cfg.ColText = c end })
 
-UIRefs.RbwChams = S4:Toggle({ Title = "Rainbow Chams", Value = false, Callback = function(v) Cfg.RbwChams = v end })
-UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callback = function(v) Cfg.RbwTracers = v end })
-UIRefs.RbwBoxes = S4:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
-UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
+UIRefs.ThickTracer = S4:Slider({ Title = "Tracer Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickTracer = v end })
+UIRefs.ThickBox = S4:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 10, Default = 1 }, Callback = function(v) Cfg.ThickBox = v end })
+UIRefs.SizeText = S4:Slider({ Title = "Text Size", Value = { Min = 1, Max = 50, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
+UIRefs.BoxScale = S4:Slider({ Title = "Box Scale", Value = { Min = 0.1, Max = 5, Default = 1 }, Callback = function(v) Cfg.BoxScale = v end })
 
--- Вкладка Configs
+local S5 = T1:Section({ Title = "Rainbow Effects" })
+
+UIRefs.RbwChams = S5:Toggle({ Title = "Rainbow Chams", Value = false, Callback = function(v) Cfg.RbwChams = v end })
+UIRefs.RbwTracers = S5:Toggle({ Title = "Rainbow Tracers", Value = false, Callback = function(v) Cfg.RbwTracers = v end })
+UIRefs.RbwBoxes = S5:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
+UIRefs.RbwText = S5:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
+
+-- Вкладка Configs (одна секция)
 local T2 = Win:Tab({ Title = "Configs", Icon = "save" })
+local S_Config = T2:Section({ Title = "Config Manager" })
 
-local S5 = T2:Section({ Title = "Save Config" })
-local NameBox = S5:Input({ Title = "Config Name", Value = "default", Placeholder = "Enter name..." })
+local NameBox = S_Config:Input({ Title = "Config Name", Value = "default", Placeholder = "Enter name..." })
 
-S5:Button({
+S_Config:Button({
     Title = "Save Current Settings",
     Callback = function()
         local n = NameBox.Value
@@ -490,11 +517,9 @@ S5:Button({
     end
 })
 
-local S6 = T2:Section({ Title = "Load / Manage" })
-
 UIRefs.SelectedConfig = "None"
 
-UIRefs.ConfigDropdown = S6:Dropdown({
+UIRefs.ConfigDropdown = S_Config:Dropdown({
     Title = "Select Config",
     Values = getConfigList(),
     Default = "None",
@@ -503,7 +528,7 @@ UIRefs.ConfigDropdown = S6:Dropdown({
     end
 })
 
-S6:Button({
+S_Config:Button({
     Title = "Refresh List",
     Callback = function()
         UIRefs.ConfigDropdown:Refresh(getConfigList(), true)
@@ -511,7 +536,7 @@ S6:Button({
     end
 })
 
-S6:Button({
+S_Config:Button({
     Title = "Load Selected",
     Callback = function()
         local sel = UIRefs.SelectedConfig
@@ -525,7 +550,7 @@ S6:Button({
     end
 })
 
-S6:Button({
+S_Config:Button({
     Title = "Delete Selected",
     Callback = function()
         local sel = UIRefs.SelectedConfig
@@ -541,10 +566,8 @@ S6:Button({
     end
 })
 
-local S7 = T2:Section({ Title = "Autoload" })
-
-local autoloadStatus = S7:Paragraph({
-    Title = "Status",
+local autoloadStatus = S_Config:Paragraph({
+    Title = "Autoload Status",
     Desc = "Disabled"
 })
 
@@ -558,7 +581,7 @@ local function refreshAutoloadText()
 end
 refreshAutoloadText()
 
-S7:Button({
+S_Config:Button({
     Title = "Set Selected as Autoload",
     Callback = function()
         local sel = UIRefs.SelectedConfig
@@ -570,7 +593,7 @@ S7:Button({
     end
 })
 
-S7:Button({
+S_Config:Button({
     Title = "Clear Autoload",
     Callback = function()
         setAutoloadName("")
@@ -579,9 +602,7 @@ S7:Button({
     end
 })
 
-local S8 = T2:Section({ Title = "Danger Zone" })
-
-S8:Button({
+S_Config:Button({
     Title = "FULL UNLOAD (clean everything)",
     Callback = function()
         unloadScript()
