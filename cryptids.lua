@@ -1,4 +1,4 @@
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+\local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -183,30 +183,6 @@ track(RunService.RenderStepped:Connect(function()
         local dist = math.max(1, math.floor((hrp.Position - root.Position).Magnitude))
         local inRange = dist >= Cfg.MinD and dist <= Cfg.MaxD
 
-        -- Логика трейсеров как в XS (clamping to screen edges)
-        local dx = sp.X - oX
-        local dy = sp.Y - oY
-        local bh = (sp.Z < 0)
-        if bh then dx = -dx dy = -dy end
-        local rl = math.sqrt(dx*dx + dy*dy)
-        local ux, uy
-        if rl < 0.001 then ux, uy = 0, 1 else ux = dx/rl uy = dy/rl end
-        local tL = math.huge
-        if ux > 0.0001 then tL = math.min(tL, (vp.X - oX) / ux) end
-        if ux < -0.0001 then tL = math.min(tL, -oX / ux) end
-        if uy > 0.0001 then tL = math.min(tL, (vp.Y - oY) / uy) end
-        if uy < -0.0001 then tL = math.min(tL, -oY / uy) end
-        if tL == math.huge or tL < 1 then tL = 1 end
-        
-        local tx, ty
-        if onScr and not bh then
-            tx = sp.X
-            ty = sp.Y
-        else
-            tx = oX + ux * tL
-            ty = oY + uy * tL
-        end
-
         if Cfg.Chams and inRange then
             d.hl.Enabled = true
             local cc = Cfg.RbwChams and rbw or Cfg.ColChams
@@ -217,13 +193,39 @@ track(RunService.RenderStepped:Connect(function()
         end
 
         if Cfg.ESP and inRange then
+            -- Вычисление конца трейсера (прижимает к краю экрана как в XS)
+            local dx = sp.X - oX
+            local dy = sp.Y - oY
+            local bh = (sp.Z < 0)
+            if bh then dx = -dx dy = -dy end
+            
+            local rl = math.sqrt(dx*dx + dy*dy)
+            local ux, uy
+            if rl < 0.001 then ux, uy = 0, 1 else ux = dx/rl uy = dy/rl end
+            
+            local tL = math.huge
+            if ux > 0.0001 then tL = math.min(tL, (vp.X - oX) / ux) end
+            if ux < -0.0001 then tL = math.min(tL, -oX / ux) end
+            if uy > 0.0001 then tL = math.min(tL, (vp.Y - oY) / uy) end
+            if uy < -0.0001 then tL = math.min(tL, -oY / uy) end
+            if tL == math.huge or tL < 1 then tL = 1 end
+            
+            local tx, ty
+            if onScr and not bh then
+                tx = sp.X
+                ty = sp.Y
+            else
+                tx = oX + ux * tL
+                ty = oY + uy * tL
+            end
+
+            -- Текст
             local tStr = ""
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
                 if tStr ~= "" then tStr = tStr .. " " end
                 tStr = tStr .. "[" .. dist .. "]"
             end
-
             if tStr ~= "" then
                 d.bb.Enabled = true
                 d.txt.Text = tStr
@@ -233,6 +235,7 @@ track(RunService.RenderStepped:Connect(function()
                 d.bb.Enabled = false
             end
 
+            -- Трейсер (теперь рисуется ВСЕГДА, независимо от того, видно его или нет)
             if Cfg.Tracers then
                 d.tr.From = Vector2.new(oX, oY)
                 d.tr.To = Vector2.new(tx, ty)
@@ -243,6 +246,7 @@ track(RunService.RenderStepped:Connect(function()
                 d.tr.Visible = false
             end
 
+            -- Бокс (только если смотрим на него)
             if Cfg.Boxes and onScr and not bh then
                 local baseH = (vp.Y / dist) * 3
                 local h = baseH * Cfg.BoxScale
