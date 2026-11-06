@@ -3,18 +3,17 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = Workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
 local Cfg = {
     ESP = false, Chams = false, Tracers = false, Boxes = false, Names = false, Dist = false,
-    MinD = 0, MaxD = 5000,
+    ForceVis = true, MinD = 0, MaxD = 5000,
     ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14,
     RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
-    AutoPhoto = false, ScanRate = 1, ForceVisible = true
+    ScanRate = 1
 }
 
 local Objs = {}
@@ -39,7 +38,7 @@ local function setup(obj)
     hl.FillTransparency = 0.5
     hl.OutlineColor = Cfg.ColChams
     hl.OutlineTransparency = 0
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Видно сквозь стены
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Adornee = obj
     hl.Enabled = Cfg.Chams
     hl.Parent = obj
@@ -123,64 +122,6 @@ task.spawn(function()
     end
 end)
 
-local function getNearestCryptid()
-    local char = LP.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-    local nearest, dist = nil, math.huge
-    for obj, data in pairs(Objs) do
-        if data.root and data.root.Parent then
-            local d = (hrp.Position - data.root.Position).Magnitude
-            if d < dist then
-                dist = d
-                nearest = obj
-            end
-        end
-    end
-    return nearest, dist
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if Cfg.AutoPhoto then
-            local target = getNearestCryptid()
-            if target then
-                local camTool = nil
-                local char = LP.Character
-                local bp = LP:FindFirstChild("Backpack")
-                if char then
-                    for _, t in ipairs(char:GetChildren()) do
-                        if t:IsA("Tool") and string.find(string.lower(t.Name), "camera") then camTool = t end
-                    end
-                end
-                if not camTool and bp then
-                    for _, t in ipairs(bp:GetChildren()) do
-                        if t:IsA("Tool") and string.find(string.lower(t.Name), "camera") then camTool = t end
-                    end
-                end
-                if camTool then
-                    if camTool.Parent ~= char then
-                        local hum = char and char:FindFirstChildOfClass("Humanoid")
-                        if hum then hum:EquipTool(camTool) task.wait(0.1) end
-                    end
-                    local root = getRoot(target)
-                    if root then
-                        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, root.Position)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                        task.wait(0.05)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 1)
-                        task.wait(0.05)
-                        VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 1)
-                    end
-                end
-            end
-        end
-    end
-end)
-
 RunService.RenderStepped:Connect(function()
     if not Cfg.ESP then
         for _, d in pairs(Objs) do
@@ -205,8 +146,7 @@ RunService.RenderStepped:Connect(function()
             continue
         end
 
-        -- ФОРСИРУЕМ ВИДИМОСТЬ (отключаем скрытие от игры)
-        if Cfg.ForceVisible then
+        if Cfg.ForceVis then
             for _, p in ipairs(obj:GetDescendants()) do
                 if p:IsA("BasePart") then
                     p.LocalTransparencyModifier = 0
@@ -295,12 +235,12 @@ local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
 local S1 = T1:Section({ Title = "Main" })
 
 UIRefs.ESP = S1:Toggle({ Title = "Master ESP", Value = false, Callback = function(v) Cfg.ESP = v end })
+UIRefs.ForceVis = S1:Toggle({ Title = "Force Visibility (Anti-Hide)", Value = true, Callback = function(v) Cfg.ForceVis = v end })
 UIRefs.Chams = S1:Toggle({ Title = "Chams", Value = false, Callback = function(v) Cfg.Chams = v end })
 UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = function(v) Cfg.Tracers = v end })
 UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
 UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
 UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
-UIRefs.ForceVisible = S1:Toggle({ Title = "Force Visibility (Bypass Hide)", Value = true, Callback = function(v) Cfg.ForceVisible = v end })
 
 local S2 = T1:Section({ Title = "Filters & Scan" })
 
@@ -325,26 +265,6 @@ UIRefs.RbwChams = S4:Toggle({ Title = "Rainbow Chams", Value = false, Callback =
 UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callback = function(v) Cfg.RbwTracers = v end })
 UIRefs.RbwBoxes = S4:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
 UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
-
-local T2 = Win:Tab({ Title = "Utility", Icon = "crosshair" })
-local S5 = T2:Section({ Title = "Actions" })
-
-S5:Button({
-    Title = "Teleport to Nearest",
-    Callback = function()
-        local target = getNearestCryptid()
-        if target then
-            local root = getRoot(target)
-            local char = LP.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if root and hrp then
-                hrp.CFrame = CFrame.new(root.Position + Vector3.new(0, 5, 5))
-            end
-        end
-    end
-})
-
-UIRefs.AutoPhoto = S5:Toggle({ Title = "Auto Photo", Value = false, Callback = function(v) Cfg.AutoPhoto = v end })
 
 local T3 = Win:Tab({ Title = "Configs", Icon = "save" })
 local S6 = T3:Section({ Title = "Config Manager" })
