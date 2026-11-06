@@ -159,6 +159,9 @@ track(RunService.RenderStepped:Connect(function()
     if not hrp then return end
 
     local rbw = getRainbow()
+    local vp = Camera.ViewportSize
+    local oX = vp.X / 2
+    local oY = vp.Y / 2
 
     for obj, d in pairs(Objs) do
         local root = d.root
@@ -179,6 +182,30 @@ track(RunService.RenderStepped:Connect(function()
         local sp, onScr = Camera:WorldToViewportPoint(root.Position)
         local dist = math.max(1, math.floor((hrp.Position - root.Position).Magnitude))
         local inRange = dist >= Cfg.MinD and dist <= Cfg.MaxD
+
+        -- Логика трейсеров как в XS (clamping to screen edges)
+        local dx = sp.X - oX
+        local dy = sp.Y - oY
+        local bh = (sp.Z < 0)
+        if bh then dx = -dx dy = -dy end
+        local rl = math.sqrt(dx*dx + dy*dy)
+        local ux, uy
+        if rl < 0.001 then ux, uy = 0, 1 else ux = dx/rl uy = dy/rl end
+        local tL = math.huge
+        if ux > 0.0001 then tL = math.min(tL, (vp.X - oX) / ux) end
+        if ux < -0.0001 then tL = math.min(tL, -oX / ux) end
+        if uy > 0.0001 then tL = math.min(tL, (vp.Y - oY) / uy) end
+        if uy < -0.0001 then tL = math.min(tL, -oY / uy) end
+        if tL == math.huge or tL < 1 then tL = 1 end
+        
+        local tx, ty
+        if onScr and not bh then
+            tx = sp.X
+            ty = sp.Y
+        else
+            tx = oX + ux * tL
+            ty = oY + uy * tL
+        end
 
         if Cfg.Chams and inRange then
             d.hl.Enabled = true
@@ -206,31 +233,26 @@ track(RunService.RenderStepped:Connect(function()
                 d.bb.Enabled = false
             end
 
-            if onScr and sp.Z > 0 then
-                if Cfg.Tracers then
-                    d.tr.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    d.tr.To = Vector2.new(sp.X, sp.Y)
-                    d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
-                    d.tr.Thickness = Cfg.ThickTracer
-                    d.tr.Visible = true
-                else
-                    d.tr.Visible = false
-                end
-
-                if Cfg.Boxes then
-                    local baseH = (Camera.ViewportSize.Y / dist) * 3
-                    local h = baseH * Cfg.BoxScale
-                    local w = h / 2
-                    d.bx.Size = Vector2.new(w, h)
-                    d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
-                    d.bx.Color = Cfg.RbwBoxes and rbw or Cfg.ColBox
-                    d.bx.Thickness = Cfg.ThickBox
-                    d.bx.Visible = true
-                else
-                    d.bx.Visible = false
-                end
+            if Cfg.Tracers then
+                d.tr.From = Vector2.new(oX, oY)
+                d.tr.To = Vector2.new(tx, ty)
+                d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
+                d.tr.Thickness = Cfg.ThickTracer
+                d.tr.Visible = true
             else
                 d.tr.Visible = false
+            end
+
+            if Cfg.Boxes and onScr and not bh then
+                local baseH = (vp.Y / dist) * 3
+                local h = baseH * Cfg.BoxScale
+                local w = h / 2
+                d.bx.Size = Vector2.new(w, h)
+                d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
+                d.bx.Color = Cfg.RbwBoxes and rbw or Cfg.ColBox
+                d.bx.Thickness = Cfg.ThickBox
+                d.bx.Visible = true
+            else
                 d.bx.Visible = false
             end
         else
