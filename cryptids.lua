@@ -156,9 +156,9 @@ RunService.RenderStepped:Connect(function()
         end
 
         local sp, onScr = Camera:WorldToViewportPoint(root.Position)
-        local dist = math.floor((hrp.Position - root.Position).Magnitude)
+        local dist = math.max(1, math.floor((hrp.Position - root.Position).Magnitude))
 
-        if onScr and dist >= Cfg.MinD and dist <= Cfg.MaxD then
+        if dist >= Cfg.MinD and dist <= Cfg.MaxD then
             local tStr = ""
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
@@ -184,25 +184,30 @@ RunService.RenderStepped:Connect(function()
                 d.hl.Enabled = false
             end
 
-            if Cfg.Tracers then
-                d.tr.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                d.tr.To = Vector2.new(sp.X, sp.Y)
-                d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
-                d.tr.Thickness = Cfg.ThickTracer
-                d.tr.Visible = true
+            if onScr and sp.Z > 0 then
+                if Cfg.Tracers then
+                    d.tr.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    d.tr.To = Vector2.new(sp.X, sp.Y)
+                    d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
+                    d.tr.Thickness = Cfg.ThickTracer
+                    d.tr.Visible = true
+                else
+                    d.tr.Visible = false
+                end
+
+                if Cfg.Boxes then
+                    local h = (Camera.ViewportSize.Y / dist) * 3
+                    local w = h / 2
+                    d.bx.Size = Vector2.new(w, h)
+                    d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
+                    d.bx.Color = Cfg.RbwBoxes and rbw or Cfg.ColBox
+                    d.bx.Thickness = Cfg.ThickBox
+                    d.bx.Visible = true
+                else
+                    d.bx.Visible = false
+                end
             else
                 d.tr.Visible = false
-            end
-
-            if Cfg.Boxes then
-                local h = (Camera.ViewportSize.Y / dist) * 3
-                local w = h / 2
-                d.bx.Size = Vector2.new(w, h)
-                d.bx.Position = Vector2.new(sp.X - w / 2, sp.Y - h / 2)
-                d.bx.Color = Cfg.RbwBoxes and rbw or Cfg.ColBox
-                d.bx.Thickness = Cfg.ThickBox
-                d.bx.Visible = true
-            else
                 d.bx.Visible = false
             end
         else
