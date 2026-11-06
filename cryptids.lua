@@ -14,7 +14,7 @@ local Cfg = {
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14,
     RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
-    AutoPhoto = false
+    AutoPhoto = false, ScanRate = 1
 }
 
 local Objs = {}
@@ -92,11 +92,20 @@ local function checkName(n)
     return string.find(string.lower(n), "cryptid", 1, true) ~= nil
 end
 
-for _, v in pairs(Workspace:GetDescendants()) do
-    if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) then
-        setup(v)
+local function doScan()
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) and not Objs[v] then
+            setup(v)
+        end
+    end
+    for obj, d in pairs(Objs) do
+        if not obj.Parent or not d.root or not d.root.Parent then
+            cleanup(obj)
+        end
     end
 end
+
+doScan()
 
 Workspace.DescendantAdded:Connect(function(v)
     if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) then
@@ -107,12 +116,9 @@ Workspace.DescendantAdded:Connect(function(v)
 end)
 
 task.spawn(function()
-    while task.wait(1) do
-        for obj, d in pairs(Objs) do
-            if not obj.Parent or not d.root or not d.root.Parent then
-                cleanup(obj)
-            end
-        end
+    while true do
+        task.wait(Cfg.ScanRate)
+        doScan()
     end
 end)
 
@@ -282,12 +288,13 @@ UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v
 UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
 UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
 
-local S2 = T1:Section({ Title = "Filters" })
+local S2 = T1:Section({ Title = "Filters & Scan" })
 
 UIRefs.MinD = S2:Slider({ Title = "Min Distance", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
 UIRefs.MaxD = S2:Slider({ Title = "Max Distance", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
+UIRefs.ScanRate = S2:Slider({ Title = "Check Time (sec)", Value = { Min = 0.3, Max = 5, Default = 1 }, Callback = function(v) Cfg.ScanRate = v end })
 
-local S3 = T1:Section({ Title = "Colors" })
+local S3 = T1:Section({ Title = "Colors & Sizes" })
 
 UIRefs.ColChams = S3:Colorpicker({ Title = "Chams Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
 UIRefs.ColTracer = S3:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTracer, Callback = function(c) Cfg.ColTracer = c end })
