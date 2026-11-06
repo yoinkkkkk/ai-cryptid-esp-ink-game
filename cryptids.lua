@@ -415,7 +415,7 @@ end
 
 local function getConfigList()
     local list = {}
-    if not listfiles or not isfolder then return list end
+    if not listfiles or not isfolder then return {"None"} end
     ensureDir()
     local ok, files = pcall(listfiles, "CryptidCfg")
     if ok and type(files) == "table" then
@@ -425,6 +425,7 @@ local function getConfigList()
         end
     end
     table.sort(list)
+    if #list == 0 then table.insert(list, "None") end
     return list
 end
 
@@ -467,19 +468,21 @@ UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = f
 
 -- Вкладка Configs
 local T2 = Win:Tab({ Title = "Configs", Icon = "save" })
-local S5 = T2:Section({ Title = "Config Manager" })
 
+local S5 = T2:Section({ Title = "Save Config" })
 local NameBox = S5:Input({ Title = "Config Name", Value = "default", Placeholder = "Enter name..." })
 
 S5:Button({
-    Title = "Save Config",
+    Title = "Save Current Settings",
     Callback = function()
         local n = NameBox.Value
         if n == "" then n = "default" end
         if saveCfgTo(n) then
             Win:Notify({ Title = "Saved", Content = n, Duration = 2 })
-            if UIRefs.Dropdown then
-                UIRefs.Dropdown:Refresh(getConfigList(), true)
+            if UIRefs.ConfigDropdown then
+                UIRefs.ConfigDropdown:Refresh(getConfigList(), true)
+                UIRefs.ConfigDropdown:Set(n)
+                UIRefs.SelectedConfig = n
             end
         else
             Win:Notify({ Title = "Error", Content = "writefile missing", Duration = 2 })
@@ -487,62 +490,60 @@ S5:Button({
     end
 })
 
-local currentList = getConfigList()
-if #currentList == 0 then currentList = {"None"} end
+local S6 = T2:Section({ Title = "Load / Manage" })
 
-UIRefs.Dropdown = S5:Dropdown({
+UIRefs.SelectedConfig = "None"
+
+UIRefs.ConfigDropdown = S6:Dropdown({
     Title = "Select Config",
-    Values = currentList,
-    Default = 1,
+    Values = getConfigList(),
+    Default = "None",
     Callback = function(selected)
         UIRefs.SelectedConfig = selected
     end
 })
 
-S5:Button({
-    Title = "Refresh Config List",
+S6:Button({
+    Title = "Refresh List",
     Callback = function()
-        local list = getConfigList()
-        if #list == 0 then list = {"None"} end
-        UIRefs.Dropdown:Refresh(list, true)
-        Win:Notify({ Title = "Configs", Content = "List refreshed", Duration = 2 })
+        UIRefs.ConfigDropdown:Refresh(getConfigList(), true)
+        Win:Notify({ Title = "List", Content = "Refreshed", Duration = 2 })
     end
 })
 
-S5:Button({
-    Title = "Load Selected Config",
+S6:Button({
+    Title = "Load Selected",
     Callback = function()
-        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        local sel = UIRefs.SelectedConfig
         if not sel or sel == "None" then
-            Win:Notify({ Title = "Error", Content = "No config selected", Duration = 2 })
+            Win:Notify({ Title = "Error", Content = "Select a config first", Duration = 2 })
             return
         end
         if loadCfgFrom(sel) then
             Win:Notify({ Title = "Loaded", Content = sel, Duration = 2 })
-        else
-            Win:Notify({ Title = "Error", Content = "Failed to load", Duration = 2 })
         end
     end
 })
 
-S5:Button({
-    Title = "Delete Selected Config",
+S6:Button({
+    Title = "Delete Selected",
     Callback = function()
-        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        local sel = UIRefs.SelectedConfig
         if not sel or sel == "None" then return end
         if delfile then
             pcall(delfile, CONFIG_DIR .. sel .. ".json")
             Win:Notify({ Title = "Deleted", Content = sel, Duration = 2 })
             local list = getConfigList()
-            if #list == 0 then list = {"None"} end
-            UIRefs.Dropdown:Refresh(list, true)
+            UIRefs.ConfigDropdown:Refresh(list, true)
+            UIRefs.SelectedConfig = list[1] or "None"
+            UIRefs.ConfigDropdown:Set(UIRefs.SelectedConfig)
         end
     end
 })
 
-local S6 = T2:Section({ Title = "Autoload" })
+local S7 = T2:Section({ Title = "Autoload" })
 
-local autoloadStatus = S6:Paragraph({
+local autoloadStatus = S7:Paragraph({
     Title = "Status",
     Desc = "Disabled"
 })
@@ -557,10 +558,10 @@ local function refreshAutoloadText()
 end
 refreshAutoloadText()
 
-S6:Button({
+S7:Button({
     Title = "Set Selected as Autoload",
     Callback = function()
-        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        local sel = UIRefs.SelectedConfig
         if not sel or sel == "None" then return end
         if setAutoloadName(sel) then
             refreshAutoloadText()
@@ -569,16 +570,18 @@ S6:Button({
     end
 })
 
-S6:Button({
+S7:Button({
     Title = "Clear Autoload",
     Callback = function()
         setAutoloadName("")
         refreshAutoloadText()
-        Win:Notify({ Title = "Autoload cleared", Content = "ok", Duration = 2 })
+        Win:Notify({ Title = "Autoload", Content = "Cleared", Duration = 2 })
     end
 })
 
-S6:Button({
+local S8 = T2:Section({ Title = "Danger Zone" })
+
+S8:Button({
     Title = "FULL UNLOAD (clean everything)",
     Callback = function()
         unloadScript()
