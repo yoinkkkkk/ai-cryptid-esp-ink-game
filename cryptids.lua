@@ -309,12 +309,11 @@ end
 
 getgenv().CryptidESP_Unload = unloadScript
 
--- НАЗВАНИЕ СКРИПТА
 local Win = WindUI:CreateWindow({
     Title = "cryptids esp inkk",
     Icon = "eye",
     Theme = "Dark",
-    Size = UDim2.fromOffset(520, 480),
+    Size = UDim2.fromOffset(520, 500),
     ToggleKey = Enum.KeyCode.RightShift,
     OpenButton = {
         Title = "cryptids esp inkk",
@@ -333,7 +332,6 @@ if getgenv then
     getgenv().CryptidWin = Win
 end
 
--- ЖЕСТКИЙ ФИКС SHIFT
 local function toggleWindow()
     pcall(function()
         if Win.Toggle then
@@ -354,7 +352,8 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
-local AUTOLOAD_FILE = "CryptidCfg/_autoload.txt"
+local CONFIG_DIR = "CryptidCfg/"
+local AUTOLOAD_FILE = CONFIG_DIR .. "_autoload.txt"
 
 local function ensureDir()
     if writefile and not isfolder("CryptidCfg") then
@@ -373,13 +372,13 @@ local function saveCfgTo(name)
             d[k] = v
         end
     end
-    local ok = pcall(writefile, "CryptidCfg/" .. name .. ".json", HttpService:JSONEncode(d))
+    local ok = pcall(writefile, CONFIG_DIR .. name .. ".json", HttpService:JSONEncode(d))
     return ok
 end
 
 local function loadCfgFrom(name)
     if not isfile or not readfile then return false end
-    local p = "CryptidCfg/" .. name .. ".json"
+    local p = CONFIG_DIR .. name .. ".json"
     if not isfile(p) then return false end
     local s, raw = pcall(readfile, p)
     if not s or not raw then return false end
@@ -414,7 +413,85 @@ local function setAutoloadName(name)
     return pcall(writefile, AUTOLOAD_FILE, name or "")
 end
 
--- ПОНЯТНЫЕ НАЗВАНИЯ
+-- СПИСОК КОНФИГОВ
+local function refreshConfigList()
+    if not UIRefs.ConfigListFrame then return end
+    for _, child in ipairs(UIRefs.ConfigListFrame:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    if not listfiles or not isfolder then return end
+    ensureDir()
+    
+    local files = {}
+    local ok, raw_files = pcall(listfiles, "CryptidCfg")
+    if ok and type(raw_files) == "table" then
+        for _, f in ipairs(raw_files) do
+            local n = string.match(f, "([^/\\]+)%.json$")
+            if n then table.insert(files, n) end
+        end
+    end
+    
+    table.sort(files)
+    local yOffset = 0
+    
+    for _, f in ipairs(files) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -20, 0, 24)
+        btn.Position = UDim2.fromOffset(10, yOffset)
+        btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+        btn.BorderSizePixel = 0
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.TextColor3 = Color3.fromRGB(220, 220, 240)
+        btn.Text = "📁 " .. f
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = UIRefs.ConfigListFrame
+        
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.fromOffset(20, 18)
+        loadBtn.Position = UDim2.new(1, -48, 0.5, -9)
+        loadBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+        loadBtn.BorderSizePixel = 0
+        loadBtn.Font = Enum.Font.GothamBlack
+        loadBtn.TextSize = 12
+        loadBtn.TextColor3 = Color3.new(1,1,1)
+        loadBtn.Text = "L"
+        loadBtn.Parent = btn
+        
+        loadBtn.MouseButton1Click:Connect(function()
+            if loadCfgFrom(f) then
+                Win:Notify({ Title = "Loaded", Content = f, Duration = 2 })
+            else
+                Win:Notify({ Title = "Error", Content = "Failed to load", Duration = 2 })
+            end
+        end)
+        
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.fromOffset(20, 18)
+        delBtn.Position = UDim2.new(1, -24, 0.5, -9)
+        delBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 30)
+        delBtn.BorderSizePixel = 0
+        delBtn.Font = Enum.Font.GothamBlack
+        delBtn.TextSize = 12
+        delBtn.TextColor3 = Color3.new(1,1,1)
+        delBtn.Text = "X"
+        delBtn.Parent = btn
+        
+        delBtn.MouseButton1Click:Connect(function()
+            if delfile then
+                pcall(delfile, CONFIG_DIR .. f .. ".json")
+                Win:Notify({ Title = "Deleted", Content = f, Duration = 2 })
+                refreshConfigList()
+            end
+        end)
+        
+        yOffset = yOffset + 28
+    end
+end
+
 local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
 local S1 = T1:Section({ Title = "ESP Options" })
 
@@ -464,6 +541,7 @@ S5:Button({
         if n == "" then n = "default" end
         if saveCfgTo(n) then
             Win:Notify({ Title = "Saved", Content = n, Duration = 2 })
+            refreshConfigList()
         else
             Win:Notify({ Title = "Error", Content = "writefile missing", Duration = 2 })
         end
@@ -471,19 +549,31 @@ S5:Button({
 })
 
 S5:Button({
-    Title = "Load Config",
+    Title = "Refresh Config List",
     Callback = function()
-        local n = NameBox.Value
-        if n == "" then n = "default" end
-        if loadCfgFrom(n) then
-            Win:Notify({ Title = "Loaded", Content = n, Duration = 2 })
-        else
-            Win:Notify({ Title = "Error", Content = "not found", Duration = 2 })
-        end
+        refreshConfigList()
+        Win:Notify({ Title = "Configs", Content = "List refreshed", Duration = 2 })
     end
 })
 
-local autoloadStatus = S5:Paragraph({
+-- СЕКЦИЯ СПИСКА КОНФИГОВ
+local S6 = T2:Section({ Title = "Saved Configs (Click L to load, X to delete)" })
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Size = UDim2.new(1, 0, 0, 150)
+listFrame.BackgroundTransparency = 1
+listFrame.BorderSizePixel = 0
+listFrame.ScrollBarThickness = 3
+listFrame.ScrollBarImageColor3 = Color3.fromRGB(170, 0, 255)
+listFrame.CanvasSize = UDim2.fromOffset(0, 0)
+listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+listFrame.Parent = S6.UIElements and S6.UIElements.Content or S6.Frame or S6.Container or S6
+UIRefs.ConfigListFrame = listFrame
+
+task.defer(refreshConfigList)
+
+local S7 = T2:Section({ Title = "Autoload Settings" })
+
+local autoloadStatus = S7:Paragraph({
     Title = "Autoload Status",
     Desc = "Disabled"
 })
@@ -498,7 +588,7 @@ local function refreshAutoloadText()
 end
 refreshAutoloadText()
 
-S5:Button({
+S7:Button({
     Title = "Set Current as Autoload",
     Callback = function()
         local n = NameBox.Value
@@ -511,7 +601,7 @@ S5:Button({
     end
 })
 
-S5:Button({
+S7:Button({
     Title = "Clear Autoload",
     Callback = function()
         setAutoloadName("")
@@ -520,7 +610,7 @@ S5:Button({
     end
 })
 
-S5:Button({
+S7:Button({
     Title = "FULL UNLOAD (clean everything)",
     Callback = function()
         unloadScript()
