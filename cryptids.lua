@@ -1,4 +1,4 @@
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+\local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,7 +8,7 @@ local LP = Players.LocalPlayer
 
 local Cfg = {
     ESP = false, Chams = false, Tracers = false, Boxes = false, Names = false, Dist = false,
-    ForceVis = true, MinD = 0, MaxD = 5000,
+    MinD = 0, MaxD = 5000,
     ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14,
@@ -146,13 +146,11 @@ RunService.RenderStepped:Connect(function()
             continue
         end
 
-        if Cfg.ForceVis then
-            for _, p in ipairs(obj:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.LocalTransparencyModifier = 0
-                    if p.Transparency > 0.5 then
-                        p.Transparency = 0.5
-                    end
+        for _, p in ipairs(obj:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.LocalTransparencyModifier = 0
+                if p.Transparency > 0.5 then
+                    p.Transparency = 0.5
                 end
             end
         end
@@ -235,7 +233,6 @@ local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
 local S1 = T1:Section({ Title = "Main" })
 
 UIRefs.ESP = S1:Toggle({ Title = "Master ESP", Value = false, Callback = function(v) Cfg.ESP = v end })
-UIRefs.ForceVis = S1:Toggle({ Title = "Force Visibility (Anti-Hide)", Value = true, Callback = function(v) Cfg.ForceVis = v end })
 UIRefs.Chams = S1:Toggle({ Title = "Chams", Value = false, Callback = function(v) Cfg.Chams = v end })
 UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = function(v) Cfg.Tracers = v end })
 UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
