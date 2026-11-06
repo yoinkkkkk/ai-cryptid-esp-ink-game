@@ -3,6 +3,8 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local UIS = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 local Camera = Workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
@@ -12,45 +14,69 @@ local Cfg = {
     ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14,
-    RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
-    ScanRate = 1
+    RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false
 }
 
 local Objs = {}
 local UIRefs = {}
+local S = { Running = true, Connections = {} }
+local WinRef
+
+local function track(c)
+    table.insert(S.Connections, c)
+    return c
+end
 
 local function getRainbow()
     return Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
 end
 
-local function getRoot(obj)
-    if obj:IsA("BasePart") then return obj end
-    return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart
+local function checkName(n)
+    return string.find(string.lower(n), "cryptid", 1, true) ~= nil
+end
+
+local function getTargetModel(obj)
+    if obj:IsA("Model") then return obj end
+    local m = obj:FindFirstAncestorOfClass("Model")
+    return m or obj
+end
+
+local function isTarget(v)
+    if not (v:IsA("Model") or v:IsA("BasePart")) then return false end
+    if not checkName(v.Name) then return false end
+    if v:IsA("BasePart") then
+        local p = v.Parent
+        if p and p:IsA("Model") and checkName(p.Name) then return false end
+    end
+    return true
 end
 
 local function setup(obj)
     if Objs[obj] then return end
-    local root = getRoot(obj)
+    local model = getTargetModel(obj)
+    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or (model.PrimaryPart) or (model:IsA("BasePart") and model)
     if not root then return end
 
     local hl = Instance.new("Highlight")
+    hl.Name = "c_hl"
+    hl.Parent = Camera
+    hl.Adornee = model
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.FillColor = Cfg.ColChams
     hl.FillTransparency = 0.5
     hl.OutlineColor = Cfg.ColChams
     hl.OutlineTransparency = 0
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = obj
-    hl.Enabled = Cfg.Chams
-    hl.Parent = obj
+    hl.Enabled = false
 
     local bb = Instance.new("BillboardGui")
+    bb.Name = "c_bb"
     bb.Size = UDim2.fromOffset(200, 40)
     bb.StudsOffset = Vector3.new(0, 3, 0)
     bb.AlwaysOnTop = true
     bb.MaxDistance = math.huge
     bb.Adornee = root
-    bb.Enabled = Cfg.Names or Cfg.Dist
-    bb.Parent = obj
+    bb.Enabled = false
+    bb.Parent = model
 
     local txt = Instance.new("TextLabel")
     txt.Size = UDim2.fromScale(1, 1)
@@ -75,55 +101,51 @@ local function setup(obj)
     bx.Transparency = 1
     bx.Visible = false
 
-    Objs[obj] = { hl = hl, bb = bb, txt = txt, tr = tr, bx = bx, root = root }
+    Objs[obj] = { hl = hl, bb = bb, txt = txt, tr = tr, bx = bx, root = root, model = model }
 end
 
 local function cleanup(obj)
     local d = Objs[obj]
     if not d then return end
-    if d.hl then d.hl:Destroy() end
-    if d.bb then d.bb:Destroy() end
-    if d.tr then d.tr:Remove() end
-    if d.bx then d.bx:Remove() end
+    if d.hl then pcall(function() d.hl:Destroy() end) end
+    if d.bb then pcall(function() d.bb:Destroy() end) end
+    if d.tr then pcall(function() d.tr:Remove() end) end
+    if d.bx then pcall(function() d.bx:Remove() end) end
     Objs[obj] = nil
 end
 
-local function checkName(n)
-    return string.find(string.lower(n), "cryptid", 1, true) ~= nil
-end
-
-local function doScan()
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) and not Objs[v] then
-            setup(v)
+local function initialScanChunked()
+    local queue = {Workspace}
+    local i = 1
+    local count = 0
+    while i <= #queue and S.Running do
+        local cur = queue[i]
+        i = i + 1
+        for _, child in ipairs(cur:GetChildren()) do
+            if isTarget(child) then setup(child) end
+            table.insert(queue, child)
+            count = count + 1
+            if count % 500 == 0 then
+                task.wait()
+            end
         end
     end
-    for obj, d in pairs(Objs) do
-        if not obj.Parent or not d.root or not d.root.Parent then
-            cleanup(obj)
-        end
-    end
 end
 
-doScan()
+task.spawn(initialScanChunked)
 
-Workspace.DescendantAdded:Connect(function(v)
-    if (v:IsA("Model") or v:IsA("BasePart")) and checkName(v.Name) then
+track(Workspace.DescendantAdded:Connect(function(v)
+    if S.Running and isTarget(v) then
         task.defer(function()
-            if v and v.Parent then setup(v) end
+            if v and v.Parent and S.Running then setup(v) end
         end)
     end
-end)
+end))
 
-task.spawn(function()
-    while true do
-        task.wait(Cfg.ScanRate)
-        doScan()
-    end
-end)
+track(RunService.RenderStepped:Connect(function()
+    if not S.Running then return end
 
-RunService.RenderStepped:Connect(function()
-    if not Cfg.ESP then
+    if not Cfg.ESP and not Cfg.Chams then
         for _, d in pairs(Objs) do
             if d.tr then d.tr.Visible = false end
             if d.bx then d.bx.Visible = false end
@@ -141,24 +163,34 @@ RunService.RenderStepped:Connect(function()
 
     for obj, d in pairs(Objs) do
         local root = d.root
-        if not root or not root.Parent then
+        if not root or not root.Parent or not obj.Parent then
             cleanup(obj)
             continue
         end
 
-        for _, p in ipairs(obj:GetDescendants()) do
-            if p:IsA("BasePart") then
-                p.LocalTransparencyModifier = 0
-                if p.Transparency > 0.5 then
-                    p.Transparency = 0.5
+        if Cfg.ESP then
+            for _, p in ipairs(obj:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.LocalTransparencyModifier = 0
+                    if p.Transparency > 0.5 then p.Transparency = 0.5 end
                 end
             end
         end
 
         local sp, onScr = Camera:WorldToViewportPoint(root.Position)
         local dist = math.max(1, math.floor((hrp.Position - root.Position).Magnitude))
+        local inRange = dist >= Cfg.MinD and dist <= Cfg.MaxD
 
-        if dist >= Cfg.MinD and dist <= Cfg.MaxD then
+        if Cfg.Chams and inRange then
+            d.hl.Enabled = true
+            local cc = Cfg.RbwChams and rbw or Cfg.ColChams
+            d.hl.FillColor = cc
+            d.hl.OutlineColor = cc
+        else
+            d.hl.Enabled = false
+        end
+
+        if Cfg.ESP and inRange then
             local tStr = ""
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
@@ -173,15 +205,6 @@ RunService.RenderStepped:Connect(function()
                 d.txt.TextSize = Cfg.SizeText
             else
                 d.bb.Enabled = false
-            end
-
-            if Cfg.Chams then
-                d.hl.Enabled = true
-                local cc = Cfg.RbwChams and rbw or Cfg.ColChams
-                d.hl.FillColor = cc
-                d.hl.OutlineColor = cc
-            else
-                d.hl.Enabled = false
             end
 
             if onScr and sp.Z > 0 then
@@ -211,13 +234,33 @@ RunService.RenderStepped:Connect(function()
                 d.bx.Visible = false
             end
         else
+            d.bb.Enabled = false
             d.tr.Visible = false
             d.bx.Visible = false
-            d.bb.Enabled = false
-            d.hl.Enabled = false
         end
     end
-end)
+end))
+
+local function unloadScript()
+    S.Running = false
+    for _, conn in ipairs(S.Connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    table.clear(S.Connections)
+    for obj, d in pairs(Objs) do
+        if d.hl then pcall(function() d.hl:Destroy() end) end
+        if d.bb then pcall(function() d.bb:Destroy() end) end
+        if d.tr then pcall(function() d.tr:Remove() end) end
+        if d.bx then pcall(function() d.bx:Remove() end) end
+    end
+    table.clear(Objs)
+    pcall(function() if WindUI and WinRef then WinRef:Destroy() end end)
+    if getgenv then
+        pcall(function() getgenv().CryptidESP_Unload = nil end)
+    end
+end
+
+getgenv().CryptidESP_Unload = unloadScript
 
 local Win = WindUI:CreateWindow({
     Title = "Ink Game",
@@ -225,14 +268,82 @@ local Win = WindUI:CreateWindow({
     Theme = "Dark",
     Size = UDim2.fromOffset(520, 480),
     OpenButton = {
-        Title = "C R Y P T I D",
+        Title = "CRYPTID",
         CornerRadius = UDim.new(1, 0),
-        OutlineThickness = 3,
-        OutlineColor = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1)),
-        RainbowOutline = true,
+        StrokeThickness = 4,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+        }),
         Enabled = true,
     }
 })
+WinRef = Win
+
+track(UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.End then unloadScript() end
+end))
+
+local AUTOLOAD_FILE = "CryptidCfg/_autoload.txt"
+
+local function ensureDir()
+    if writefile and not isfolder("CryptidCfg") then
+        pcall(makefolder, "CryptidCfg")
+    end
+end
+
+local function saveCfgTo(name)
+    if not writefile then return false end
+    ensureDir()
+    local d = {}
+    for k, v in pairs(Cfg) do
+        if typeof(v) == "Color3" then
+            d[k] = {v.R, v.G, v.B}
+        else
+            d[k] = v
+        end
+    end
+    local ok = pcall(writefile, "CryptidCfg/" .. name .. ".json", HttpService:JSONEncode(d))
+    return ok
+end
+
+local function loadCfgFrom(name)
+    if not isfile or not readfile then return false end
+    local p = "CryptidCfg/" .. name .. ".json"
+    if not isfile(p) then return false end
+    local s, raw = pcall(readfile, p)
+    if not s or not raw then return false end
+    local ok, d = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not ok or type(d) ~= "table" then return false end
+    for k, v in pairs(d) do
+        if type(v) == "table" and #v == 3 then
+            Cfg[k] = Color3.new(v[1], v[2], v[3])
+        else
+            Cfg[k] = v
+        end
+    end
+    for k, v in pairs(Cfg) do
+        if UIRefs[k] and UIRefs[k].Set then
+            pcall(function() UIRefs[k]:Set(v) end)
+        end
+    end
+    return true
+end
+
+local function getAutoloadName()
+    if not isfile or not readfile then return nil end
+    if not isfile(AUTOLOAD_FILE) then return nil end
+    local ok, v = pcall(readfile, AUTOLOAD_FILE)
+    if ok and v and v ~= "" then return v end
+    return nil
+end
+
+local function setAutoloadName(name)
+    if not writefile then return false end
+    ensureDir()
+    return pcall(writefile, AUTOLOAD_FILE, name or "")
+end
 
 local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
 local S1 = T1:Section({ Title = "Main" })
@@ -244,11 +355,15 @@ UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v
 UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
 UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
 
-local S2 = T1:Section({ Title = "Filters & Scan" })
+S1:Button({
+    Title = "PANIC UNLOAD (or END key)",
+    Callback = function() unloadScript() end
+})
+
+local S2 = T1:Section({ Title = "Filters" })
 
 UIRefs.MinD = S2:Slider({ Title = "Min Distance", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
 UIRefs.MaxD = S2:Slider({ Title = "Max Distance", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
-UIRefs.ScanRate = S2:Slider({ Title = "Check Time (sec)", Value = { Min = 0.3, Max = 5, Default = 1 }, Callback = function(v) Cfg.ScanRate = v end })
 
 local S3 = T1:Section({ Title = "Colors & Sizes" })
 
@@ -268,57 +383,84 @@ UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callba
 UIRefs.RbwBoxes = S4:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
 UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
 
-local T3 = Win:Tab({ Title = "Configs", Icon = "save" })
-local S6 = T3:Section({ Title = "Config Manager" })
+local T2 = Win:Tab({ Title = "Configs", Icon = "save" })
+local S5 = T2:Section({ Title = "Config Manager" })
 
-local NameBox = S6:Input({ Title = "Config Name", Value = "default", Placeholder = "Name..." })
+local NameBox = S5:Input({ Title = "Config Name", Value = "default", Placeholder = "Name..." })
 
-S6:Button({
-    Title = "Save",
+S5:Button({
+    Title = "Save Config",
     Callback = function()
         local n = NameBox.Value
         if n == "" then n = "default" end
-        local d = {}
-        for k, v in pairs(Cfg) do
-            if typeof(v) == "Color3" then
-                d[k] = {v.R, v.G, v.B}
-            else
-                d[k] = v
-            end
-        end
-        if writefile then
-            if not isfolder("CryptidCfg") then makefolder("CryptidCfg") end
-            writefile("CryptidCfg/" .. n .. ".json", game:GetService("HttpService"):JSONEncode(d))
+        if saveCfgTo(n) then
             Win:Notify({ Title = "Saved", Content = n, Duration = 2 })
+        else
+            Win:Notify({ Title = "Error", Content = "writefile missing", Duration = 2 })
         end
     end
 })
 
-S6:Button({
-    Title = "Load",
+S5:Button({
+    Title = "Load Config",
     Callback = function()
         local n = NameBox.Value
         if n == "" then n = "default" end
-        local p = "CryptidCfg/" .. n .. ".json"
-        if isfile and isfile(p) then
-            local s, d = pcall(function()
-                return game:GetService("HttpService"):JSONDecode(readfile(p))
-            end)
-            if s and d then
-                for k, v in pairs(d) do
-                    if type(v) == "table" and #v == 3 then
-                        Cfg[k] = Color3.new(v[1], v[2], v[3])
-                    else
-                        Cfg[k] = v
-                    end
-                end
-                for k, v in pairs(Cfg) do
-                    if UIRefs[k] and UIRefs[k].Set then
-                        pcall(function() UIRefs[k]:Set(v) end)
-                    end
-                end
-                Win:Notify({ Title = "Loaded", Content = n, Duration = 2 })
-            end
+        if loadCfgFrom(n) then
+            Win:Notify({ Title = "Loaded", Content = n, Duration = 2 })
+        else
+            Win:Notify({ Title = "Error", Content = "not found", Duration = 2 })
         end
     end
 })
+
+local autoloadStatus = S5:Paragraph({
+    Title = "Autoload",
+    Desc = "Disabled"
+})
+
+local function refreshAutoloadText()
+    local n = getAutoloadName()
+    if autoloadStatus and autoloadStatus.SetDesc then
+        pcall(function()
+            autoloadStatus:SetDesc(n and ("Enabled: " .. n) or "Disabled")
+        end)
+    end
+end
+refreshAutoloadText()
+
+S5:Button({
+    Title = "Set Current as Autoload",
+    Callback = function()
+        local n = NameBox.Value
+        if n == "" then n = "default" end
+        saveCfgTo(n)
+        if setAutoloadName(n) then
+            refreshAutoloadText()
+            Win:Notify({ Title = "Autoload set", Content = n, Duration = 2 })
+        end
+    end
+})
+
+S5:Button({
+    Title = "Clear Autoload",
+    Callback = function()
+        setAutoloadName("")
+        refreshAutoloadText()
+        Win:Notify({ Title = "Autoload cleared", Content = "ok", Duration = 2 })
+    end
+})
+
+S5:Button({
+    Title = "FULL UNLOAD (clean everything)",
+    Callback = function()
+        unloadScript()
+    end
+})
+
+local autoName = getAutoloadName()
+if autoName then
+    task.defer(function()
+        loadCfgFrom(autoName)
+    end)
+end
