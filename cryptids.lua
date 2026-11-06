@@ -21,10 +21,19 @@ local Config = {
     TextColor = Color3.fromRGB(220, 150, 255),
     TracerThickness = 1,
     BoxThickness = 1,
-    TextSize = 14
+    TextSize = 14,
+    -- Rainbow settings
+    RainbowChams = false,
+    RainbowTracers = false,
+    RainbowBoxes = false,
+    RainbowText = false,
 }
 
 local tracked = {}
+
+local function getRainbowColor()
+    return Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
+end
 
 local function isCryptid(obj)
     if not obj or (not obj:IsA("Model") and not obj:IsA("BasePart")) then return false end
@@ -148,6 +157,8 @@ local function updateVisuals()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
+    local rColor = getRainbowColor()
+
     for model, data in pairs(tracked) do
         local root = data.root
         if not root or not root.Parent then
@@ -169,7 +180,7 @@ local function updateVisuals()
             if textStr ~= "" then
                 data.billboard.Enabled = true
                 data.label.Text = textStr
-                data.label.TextColor3 = Config.TextColor
+                data.label.TextColor3 = Config.RainbowText and rColor or Config.TextColor
                 data.label.TextSize = Config.TextSize
             else
                 data.billboard.Enabled = false
@@ -177,8 +188,9 @@ local function updateVisuals()
 
             if Config.Chams then
                 data.highlight.Enabled = true
-                data.highlight.FillColor = Config.ChamsColor
-                data.highlight.OutlineColor = Config.ChamsColor
+                local cColor = Config.RainbowChams and rColor or Config.ChamsColor
+                data.highlight.FillColor = cColor
+                data.highlight.OutlineColor = cColor
             else
                 data.highlight.Enabled = false
             end
@@ -186,7 +198,7 @@ local function updateVisuals()
             if Config.Tracers then
                 data.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                 data.tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                data.tracer.Color = Config.TracerColor
+                data.tracer.Color = Config.RainbowTracers and rColor or Config.TracerColor
                 data.tracer.Thickness = Config.TracerThickness
                 data.tracer.Visible = true
             else
@@ -198,7 +210,7 @@ local function updateVisuals()
                 local width = height / 2
                 data.box.Size = Vector2.new(width, height)
                 data.box.Position = Vector2.new(screenPos.X - width / 2, screenPos.Y - height / 2)
-                data.box.Color = Config.BoxColor
+                data.box.Color = Config.RainbowBoxes and rColor or Config.BoxColor
                 data.box.Thickness = Config.BoxThickness
                 data.box.Visible = true
             else
@@ -219,7 +231,15 @@ local Window = WindUI:CreateWindow({
     Title = "Ink Game",
     Icon = "eye",
     Theme = "Dark",
-    Size = UDim2.fromOffset(500, 450)
+    Size = UDim2.fromOffset(500, 450),
+    OpenButton = {
+        Title = "Cryptid ESP",
+        CornerRadius = UDim.new(1, 0),
+        OutlineThickness = 3, -- Толстая обводка
+        OutlineColor = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1)), -- Белая
+        RainbowOutline = true, -- Если WindUI поддерживает из коробки
+        Enabled = true,
+    }
 })
 
 local Tab = Window:Tab({ Title = "Visuals", Icon = "eye" })
@@ -228,49 +248,37 @@ local ESPGroup = Tab:Section({ Title = "ESP Options" })
 ESPGroup:Toggle({
     Title = "Master ESP",
     Value = false,
-    Callback = function(state)
-        Config.ESP = state
-    end
+    Callback = function(state) Config.ESP = state end
 })
 
 ESPGroup:Toggle({
     Title = "Chams",
     Value = false,
-    Callback = function(state)
-        Config.Chams = state
-    end
+    Callback = function(state) Config.Chams = state end
 })
 
 ESPGroup:Toggle({
     Title = "Tracers",
     Value = false,
-    Callback = function(state)
-        Config.Tracers = state
-    end
+    Callback = function(state) Config.Tracers = state end
 })
 
 ESPGroup:Toggle({
     Title = "Boxes",
     Value = false,
-    Callback = function(state)
-        Config.Boxes = state
-    end
+    Callback = function(state) Config.Boxes = state end
 })
 
 ESPGroup:Toggle({
     Title = "Names",
     Value = false,
-    Callback = function(state)
-        Config.Names = state
-    end
+    Callback = function(state) Config.Names = state end
 })
 
 ESPGroup:Toggle({
     Title = "Distance",
     Value = false,
-    Callback = function(state)
-        Config.Distance = state
-    end
+    Callback = function(state) Config.Distance = state end
 })
 
 local DistGroup = Tab:Section({ Title = "Distance Filter" })
@@ -278,17 +286,13 @@ local DistGroup = Tab:Section({ Title = "Distance Filter" })
 DistGroup:Slider({
     Title = "Min Distance",
     Value = { Min = 0, Max = 5000, Default = 0 },
-    Callback = function(value)
-        Config.MinDist = value
-    end
+    Callback = function(value) Config.MinDist = value end
 })
 
 DistGroup:Slider({
     Title = "Max Distance",
     Value = { Min = 0, Max = 5000, Default = 5000 },
-    Callback = function(value)
-        Config.MaxDist = value
-    end
+    Callback = function(value) Config.MaxDist = value end
 })
 
 local StyleGroup = Tab:Section({ Title = "Colors & Thickness" })
@@ -296,57 +300,73 @@ local StyleGroup = Tab:Section({ Title = "Colors & Thickness" })
 StyleGroup:Colorpicker({
     Title = "Chams Color",
     Default = Config.ChamsColor,
-    Callback = function(color)
-        Config.ChamsColor = color
-    end
+    Callback = function(color) Config.ChamsColor = color end
 })
 
 StyleGroup:Colorpicker({
     Title = "Tracer Color",
     Default = Config.TracerColor,
-    Callback = function(color)
-        Config.TracerColor = color
-    end
+    Callback = function(color) Config.TracerColor = color end
 })
 
 StyleGroup:Colorpicker({
     Title = "Box Color",
     Default = Config.BoxColor,
-    Callback = function(color)
-        Config.BoxColor = color
-    end
+    Callback = function(color) Config.BoxColor = color end
 })
 
 StyleGroup:Colorpicker({
     Title = "Text Color",
     Default = Config.TextColor,
-    Callback = function(color)
-        Config.TextColor = color
-    end
+    Callback = function(color) Config.TextColor = color end
 })
 
 StyleGroup:Slider({
     Title = "Tracer Thickness",
     Value = { Min = 1, Max = 5, Default = Config.TracerThickness },
-    Callback = function(value)
-        Config.TracerThickness = value
-    end
+    Callback = function(value) Config.TracerThickness = value end
 })
 
 StyleGroup:Slider({
     Title = "Box Thickness",
     Value = { Min = 1, Max = 5, Default = Config.BoxThickness },
-    Callback = function(value)
-        Config.BoxThickness = value
-    end
+    Callback = function(value) Config.BoxThickness = value end
 })
 
 StyleGroup:Slider({
     Title = "Text Size",
     Value = { Min = 10, Max = 24, Default = Config.TextSize },
-    Callback = function(value)
-        Config.TextSize = value
-    end
+    Callback = function(value) Config.TextSize = value end
 })
+
+local RainbowGroup = Tab:Section({ Title = "Rainbow Options" })
+
+RainbowGroup:Toggle({
+    Title = "Rainbow Chams",
+    Value = false,
+    Callback = function(state) Config.RainbowChams = state end
+})
+
+RainbowGroup:Toggle({
+    Title = "Rainbow Tracers",
+    Value = false,
+    Callback = function(state) Config.RainbowTracers = state end
+})
+
+RainbowGroup:Toggle({
+    Title = "Rainbow Boxes",
+    Value = false,
+    Callback = function(state) Config.RainbowBoxes = state end
+})
+
+RainbowGroup:Toggle({
+    Title = "Rainbow Text",
+    Value = false,
+    Callback = function(state) Config.RainbowText = state end
+})
+
+-- Встроенный конфиг-менеджер WindUI
+local ConfigManager = Window:ConfigManager()
+ConfigManager:Init("Cryptid_ESP_Config")
 
 initialScan()
