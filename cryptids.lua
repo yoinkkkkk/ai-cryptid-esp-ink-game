@@ -1,4 +1,4 @@
-\local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -193,7 +193,6 @@ track(RunService.RenderStepped:Connect(function()
         end
 
         if Cfg.ESP and inRange then
-            -- Вычисление конца трейсера (прижимает к краю экрана как в XS)
             local dx = sp.X - oX
             local dy = sp.Y - oY
             local bh = (sp.Z < 0)
@@ -219,7 +218,6 @@ track(RunService.RenderStepped:Connect(function()
                 ty = oY + uy * tL
             end
 
-            -- Текст
             local tStr = ""
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
@@ -235,7 +233,6 @@ track(RunService.RenderStepped:Connect(function()
                 d.bb.Enabled = false
             end
 
-            -- Трейсер (теперь рисуется ВСЕГДА, независимо от того, видно его или нет)
             if Cfg.Tracers then
                 d.tr.From = Vector2.new(oX, oY)
                 d.tr.To = Vector2.new(tx, ty)
@@ -246,7 +243,6 @@ track(RunService.RenderStepped:Connect(function()
                 d.tr.Visible = false
             end
 
-            -- Бокс (только если смотрим на него)
             if Cfg.Boxes and onScr and not bh then
                 local baseH = (vp.Y / dist) * 3
                 local h = baseH * Cfg.BoxScale
@@ -283,6 +279,7 @@ local function unloadScript()
     pcall(function() if WindUI and WinRef then WinRef:Destroy() end end)
     if getgenv then
         pcall(function() getgenv().CryptidESP_Unload = nil end)
+        pcall(function() getgenv().CryptidWin = nil end)
     end
 end
 
@@ -293,6 +290,7 @@ local Win = WindUI:CreateWindow({
     Icon = "eye",
     Theme = "Dark",
     Size = UDim2.fromOffset(520, 480),
+    ToggleKey = Enum.KeyCode.RightShift,
     OpenButton = {
         Title = "CRYPTID",
         CornerRadius = UDim.new(1, 0),
@@ -305,6 +303,10 @@ local Win = WindUI:CreateWindow({
     }
 })
 WinRef = Win
+
+if getgenv then
+    getgenv().CryptidWin = Win
+end
 
 local AUTOLOAD_FILE = "CryptidCfg/_autoload.txt"
 
