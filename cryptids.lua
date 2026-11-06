@@ -313,7 +313,7 @@ local Win = WindUI:CreateWindow({
     Title = "cryptids esp inkk",
     Icon = "eye",
     Theme = "Dark",
-    Size = UDim2.fromOffset(520, 500),
+    Size = UDim2.fromOffset(520, 520),
     ToggleKey = Enum.KeyCode.RightShift,
     OpenButton = {
         Title = "cryptids esp inkk",
@@ -413,83 +413,19 @@ local function setAutoloadName(name)
     return pcall(writefile, AUTOLOAD_FILE, name or "")
 end
 
--- СПИСОК КОНФИГОВ
-local function refreshConfigList()
-    if not UIRefs.ConfigListFrame then return end
-    for _, child in ipairs(UIRefs.ConfigListFrame:GetChildren()) do
-        if child:IsA("TextButton") or child:IsA("Frame") then
-            child:Destroy()
-        end
-    end
-    
-    if not listfiles or not isfolder then return end
+local function getConfigList()
+    local list = {}
+    if not listfiles or not isfolder then return list end
     ensureDir()
-    
-    local files = {}
-    local ok, raw_files = pcall(listfiles, "CryptidCfg")
-    if ok and type(raw_files) == "table" then
-        for _, f in ipairs(raw_files) do
+    local ok, files = pcall(listfiles, "CryptidCfg")
+    if ok and type(files) == "table" then
+        for _, f in ipairs(files) do
             local n = string.match(f, "([^/\\]+)%.json$")
-            if n then table.insert(files, n) end
+            if n then table.insert(list, n) end
         end
     end
-    
-    table.sort(files)
-    local yOffset = 0
-    
-    for _, f in ipairs(files) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -20, 0, 24)
-        btn.Position = UDim2.fromOffset(10, yOffset)
-        btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
-        btn.BorderSizePixel = 0
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 11
-        btn.TextColor3 = Color3.fromRGB(220, 220, 240)
-        btn.Text = "📁 " .. f
-        btn.TextXAlignment = Enum.TextXAlignment.Left
-        btn.Parent = UIRefs.ConfigListFrame
-        
-        local loadBtn = Instance.new("TextButton")
-        loadBtn.Size = UDim2.fromOffset(20, 18)
-        loadBtn.Position = UDim2.new(1, -48, 0.5, -9)
-        loadBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
-        loadBtn.BorderSizePixel = 0
-        loadBtn.Font = Enum.Font.GothamBlack
-        loadBtn.TextSize = 12
-        loadBtn.TextColor3 = Color3.new(1,1,1)
-        loadBtn.Text = "L"
-        loadBtn.Parent = btn
-        
-        loadBtn.MouseButton1Click:Connect(function()
-            if loadCfgFrom(f) then
-                Win:Notify({ Title = "Loaded", Content = f, Duration = 2 })
-            else
-                Win:Notify({ Title = "Error", Content = "Failed to load", Duration = 2 })
-            end
-        end)
-        
-        local delBtn = Instance.new("TextButton")
-        delBtn.Size = UDim2.fromOffset(20, 18)
-        delBtn.Position = UDim2.new(1, -24, 0.5, -9)
-        delBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 30)
-        delBtn.BorderSizePixel = 0
-        delBtn.Font = Enum.Font.GothamBlack
-        delBtn.TextSize = 12
-        delBtn.TextColor3 = Color3.new(1,1,1)
-        delBtn.Text = "X"
-        delBtn.Parent = btn
-        
-        delBtn.MouseButton1Click:Connect(function()
-            if delfile then
-                pcall(delfile, CONFIG_DIR .. f .. ".json")
-                Win:Notify({ Title = "Deleted", Content = f, Duration = 2 })
-                refreshConfigList()
-            end
-        end)
-        
-        yOffset = yOffset + 28
-    end
+    table.sort(list)
+    return list
 end
 
 local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
@@ -529,6 +465,7 @@ UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callba
 UIRefs.RbwBoxes = S4:Toggle({ Title = "Rainbow Boxes", Value = false, Callback = function(v) Cfg.RbwBoxes = v end })
 UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = function(v) Cfg.RbwText = v end })
 
+-- Вкладка Configs
 local T2 = Win:Tab({ Title = "Configs", Icon = "save" })
 local S5 = T2:Section({ Title = "Config Manager" })
 
@@ -541,40 +478,72 @@ S5:Button({
         if n == "" then n = "default" end
         if saveCfgTo(n) then
             Win:Notify({ Title = "Saved", Content = n, Duration = 2 })
-            refreshConfigList()
+            if UIRefs.Dropdown then
+                UIRefs.Dropdown:Refresh(getConfigList(), true)
+            end
         else
             Win:Notify({ Title = "Error", Content = "writefile missing", Duration = 2 })
         end
     end
 })
 
+local currentList = getConfigList()
+if #currentList == 0 then currentList = {"None"} end
+
+UIRefs.Dropdown = S5:Dropdown({
+    Title = "Select Config",
+    Values = currentList,
+    Default = 1,
+    Callback = function(selected)
+        UIRefs.SelectedConfig = selected
+    end
+})
+
 S5:Button({
     Title = "Refresh Config List",
     Callback = function()
-        refreshConfigList()
+        local list = getConfigList()
+        if #list == 0 then list = {"None"} end
+        UIRefs.Dropdown:Refresh(list, true)
         Win:Notify({ Title = "Configs", Content = "List refreshed", Duration = 2 })
     end
 })
 
--- СЕКЦИЯ СПИСКА КОНФИГОВ
-local S6 = T2:Section({ Title = "Saved Configs (Click L to load, X to delete)" })
-local listFrame = Instance.new("ScrollingFrame")
-listFrame.Size = UDim2.new(1, 0, 0, 150)
-listFrame.BackgroundTransparency = 1
-listFrame.BorderSizePixel = 0
-listFrame.ScrollBarThickness = 3
-listFrame.ScrollBarImageColor3 = Color3.fromRGB(170, 0, 255)
-listFrame.CanvasSize = UDim2.fromOffset(0, 0)
-listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-listFrame.Parent = S6.UIElements and S6.UIElements.Content or S6.Frame or S6.Container or S6
-UIRefs.ConfigListFrame = listFrame
+S5:Button({
+    Title = "Load Selected Config",
+    Callback = function()
+        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        if not sel or sel == "None" then
+            Win:Notify({ Title = "Error", Content = "No config selected", Duration = 2 })
+            return
+        end
+        if loadCfgFrom(sel) then
+            Win:Notify({ Title = "Loaded", Content = sel, Duration = 2 })
+        else
+            Win:Notify({ Title = "Error", Content = "Failed to load", Duration = 2 })
+        end
+    end
+})
 
-task.defer(refreshConfigList)
+S5:Button({
+    Title = "Delete Selected Config",
+    Callback = function()
+        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        if not sel or sel == "None" then return end
+        if delfile then
+            pcall(delfile, CONFIG_DIR .. sel .. ".json")
+            Win:Notify({ Title = "Deleted", Content = sel, Duration = 2 })
+            local list = getConfigList()
+            if #list == 0 then list = {"None"} end
+            UIRefs.Dropdown:Refresh(list, true)
+        end
+    end
+})
 
-local S7 = T2:Section({ Title = "Autoload Settings" })
+local S6 = T2:Section({ Title = "Autoload" })
 
-local autoloadStatus = S7:Paragraph({
-    Title = "Autoload Status",
+local autoloadStatus = S6:Paragraph({
+    Title = "Status",
     Desc = "Disabled"
 })
 
@@ -588,20 +557,19 @@ local function refreshAutoloadText()
 end
 refreshAutoloadText()
 
-S7:Button({
-    Title = "Set Current as Autoload",
+S6:Button({
+    Title = "Set Selected as Autoload",
     Callback = function()
-        local n = NameBox.Value
-        if n == "" then n = "default" end
-        saveCfgTo(n)
-        if setAutoloadName(n) then
+        local sel = UIRefs.SelectedConfig or (currentList[1] ~= "None" and currentList[1])
+        if not sel or sel == "None" then return end
+        if setAutoloadName(sel) then
             refreshAutoloadText()
-            Win:Notify({ Title = "Autoload set", Content = n, Duration = 2 })
+            Win:Notify({ Title = "Autoload set", Content = sel, Duration = 2 })
         end
     end
 })
 
-S7:Button({
+S6:Button({
     Title = "Clear Autoload",
     Callback = function()
         setAutoloadName("")
@@ -610,7 +578,7 @@ S7:Button({
     end
 })
 
-S7:Button({
+S6:Button({
     Title = "FULL UNLOAD (clean everything)",
     Callback = function()
         unloadScript()
