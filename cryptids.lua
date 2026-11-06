@@ -144,7 +144,7 @@ end))
 track(RunService.RenderStepped:Connect(function()
     if not S.Running then return end
 
-    if not Cfg.ESP and not Cfg.Chams then
+    if not Cfg.ESP and not Cfg.Chams and not Cfg.Tracers then
         for _, d in pairs(Objs) do
             if d.tr then d.tr.Visible = false end
             if d.bx then d.bx.Visible = false end
@@ -170,7 +170,7 @@ track(RunService.RenderStepped:Connect(function()
             continue
         end
 
-        if Cfg.ESP then
+        if Cfg.ESP or Cfg.Chams then
             for _, p in ipairs(obj:GetDescendants()) do
                 if p:IsA("BasePart") then
                     p.LocalTransparencyModifier = 0
@@ -193,31 +193,6 @@ track(RunService.RenderStepped:Connect(function()
         end
 
         if Cfg.ESP and inRange then
-            local dx = sp.X - oX
-            local dy = sp.Y - oY
-            local bh = (sp.Z < 0)
-            if bh then dx = -dx dy = -dy end
-            
-            local rl = math.sqrt(dx*dx + dy*dy)
-            local ux, uy
-            if rl < 0.001 then ux, uy = 0, 1 else ux = dx/rl uy = dy/rl end
-            
-            local tL = math.huge
-            if ux > 0.0001 then tL = math.min(tL, (vp.X - oX) / ux) end
-            if ux < -0.0001 then tL = math.min(tL, -oX / ux) end
-            if uy > 0.0001 then tL = math.min(tL, (vp.Y - oY) / uy) end
-            if uy < -0.0001 then tL = math.min(tL, -oY / uy) end
-            if tL == math.huge or tL < 1 then tL = 1 end
-            
-            local tx, ty
-            if onScr and not bh then
-                tx = sp.X
-                ty = sp.Y
-            else
-                tx = oX + ux * tL
-                ty = oY + uy * tL
-            end
-
             local tStr = ""
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
@@ -233,17 +208,7 @@ track(RunService.RenderStepped:Connect(function()
                 d.bb.Enabled = false
             end
 
-            if Cfg.Tracers then
-                d.tr.From = Vector2.new(oX, oY)
-                d.tr.To = Vector2.new(tx, ty)
-                d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
-                d.tr.Thickness = Cfg.ThickTracer
-                d.tr.Visible = true
-            else
-                d.tr.Visible = false
-            end
-
-            if Cfg.Boxes and onScr and not bh then
+            if Cfg.Boxes and onScr and sp.Z > 0 then
                 local baseH = (vp.Y / dist) * 3
                 local h = baseH * Cfg.BoxScale
                 local w = h / 2
@@ -257,8 +222,62 @@ track(RunService.RenderStepped:Connect(function()
             end
         else
             d.bb.Enabled = false
-            d.tr.Visible = false
             d.bx.Visible = false
+        end
+
+        -- ТРЕЙСЕРЫ (независимы от ESP и дистанции)
+        if Cfg.Tracers then
+            local dx = sp.X - oX
+            local dy = sp.Y - oY
+            local bh = (sp.Z < 0)
+            
+            if bh then 
+                dx = -dx 
+                dy = -dy 
+            end
+            
+            local tx, ty
+            
+            if onScr and not bh then
+                tx = sp.X
+                ty = sp.Y
+            else
+                local rl = math.sqrt(dx*dx + dy*dy)
+                local ux, uy
+                
+                if rl < 0.01 then 
+                    ux, uy = 0, 1 
+                else 
+                    ux = dx / rl 
+                    uy = dy / rl 
+                end
+                
+                local tL = math.huge
+                if ux > 0 then tL = math.min(tL, (vp.X - oX) / ux)
+                elseif ux < 0 then tL = math.min(tL, -oX / ux) end
+                
+                if uy > 0 then tL = math.min(tL, (vp.Y - oY) / uy)
+                elseif uy < 0 then tL = math.min(tL, -oY / uy) end
+                
+                if tL == math.huge or tL < 1 then tL = 1 end
+                
+                tx = oX + ux * tL
+                ty = oY + uy * tL
+            end
+            
+            if tx ~= tx then tx = oX end
+            if ty ~= ty then ty = oY + 100 end
+            
+            tx = math.clamp(tx, 0, vp.X)
+            ty = math.clamp(ty, 0, vp.Y)
+            
+            d.tr.From = Vector2.new(oX, oY)
+            d.tr.To = Vector2.new(tx, ty)
+            d.tr.Color = Cfg.RbwTracers and rbw or Cfg.ColTracer
+            d.tr.Thickness = math.max(1, Cfg.ThickTracer)
+            d.tr.Visible = true
+        else
+            d.tr.Visible = false
         end
     end
 end))
