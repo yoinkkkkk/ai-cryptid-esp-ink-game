@@ -4,13 +4,17 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local UIS = game:GetService("UserInputService")
 local Camera = Workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
 local Cfg = {
     ESP = false, Chams = false, Tracers = false, Boxes = false, Names = false, Dist = false,
     MinD = 0, MaxD = 5000,
-    ColChams = Color3.fromRGB(170, 0, 255), ColTracer = Color3.fromRGB(170, 0, 255),
+    ColChams = Color3.fromRGB(170, 0, 255), 
+    ColChamsOutline = Color3.fromRGB(255, 255, 255),
+    ChamsOutlineTransparency = 0,
+    ColTracer = Color3.fromRGB(170, 0, 255),
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14, BoxScale = 1,
     RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false
@@ -63,8 +67,8 @@ local function setup(obj)
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.FillColor = Cfg.ColChams
     hl.FillTransparency = 0.5
-    hl.OutlineColor = Cfg.ColChams
-    hl.OutlineTransparency = 0
+    hl.OutlineColor = Cfg.ColChamsOutline
+    hl.OutlineTransparency = Cfg.ChamsOutlineTransparency
     hl.Enabled = false
 
     local bb = Instance.new("BillboardGui")
@@ -186,8 +190,10 @@ track(RunService.RenderStepped:Connect(function()
         if Cfg.Chams and inRange then
             d.hl.Enabled = true
             local cc = Cfg.RbwChams and rbw or Cfg.ColChams
+            local oc = Cfg.RbwChams and rbw or Cfg.ColChamsOutline
             d.hl.FillColor = cc
-            d.hl.OutlineColor = cc
+            d.hl.OutlineColor = oc
+            d.hl.OutlineTransparency = Cfg.ChamsOutlineTransparency
         else
             d.hl.Enabled = false
         end
@@ -197,7 +203,7 @@ track(RunService.RenderStepped:Connect(function()
             if Cfg.Names then tStr = obj.Name end
             if Cfg.Dist then
                 if tStr ~= "" then tStr = tStr .. " " end
-                tStr = tStr .. "[" .. dist .. "]"
+                tStr = tStr .. "[" .. dist .. "m]"
             end
             if tStr ~= "" then
                 d.bb.Enabled = true
@@ -225,7 +231,6 @@ track(RunService.RenderStepped:Connect(function()
             d.bx.Visible = false
         end
 
-        -- ТРЕЙСЕРЫ (независимы от ESP и дистанции)
         if Cfg.Tracers then
             local dx = sp.X - oX
             local dy = sp.Y - oY
@@ -304,14 +309,15 @@ end
 
 getgenv().CryptidESP_Unload = unloadScript
 
+-- НАЗВАНИЕ СКРИПТА
 local Win = WindUI:CreateWindow({
-    Title = "Ink Game",
+    Title = "cryptids esp inkk",
     Icon = "eye",
     Theme = "Dark",
     Size = UDim2.fromOffset(520, 480),
     ToggleKey = Enum.KeyCode.RightShift,
     OpenButton = {
-        Title = "CRYPTID",
+        Title = "cryptids esp inkk",
         CornerRadius = UDim.new(1, 0),
         StrokeThickness = 4,
         Color = ColorSequence.new({
@@ -326,6 +332,27 @@ WinRef = Win
 if getgenv then
     getgenv().CryptidWin = Win
 end
+
+-- ЖЕСТКИЙ ФИКС SHIFT
+local function toggleWindow()
+    pcall(function()
+        if Win.Toggle then
+            Win:Toggle()
+        elseif Win.Main and Win.Main.Visible then
+            Win:Close()
+        else
+            Win:Open()
+        end
+    end)
+end
+
+UIS.InputBegan:Connect(function(input, gp)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if not gp or (UIS:GetFocusedTextBox() == nil) then
+            toggleWindow()
+        end
+    end
+end)
 
 local AUTOLOAD_FILE = "CryptidCfg/_autoload.txt"
 
@@ -387,24 +414,28 @@ local function setAutoloadName(name)
     return pcall(writefile, AUTOLOAD_FILE, name or "")
 end
 
+-- ПОНЯТНЫЕ НАЗВАНИЯ
 local T1 = Win:Tab({ Title = "Visuals", Icon = "eye" })
-local S1 = T1:Section({ Title = "Main" })
+local S1 = T1:Section({ Title = "ESP Options" })
 
-UIRefs.ESP = S1:Toggle({ Title = "Master ESP", Value = false, Callback = function(v) Cfg.ESP = v end })
-UIRefs.Chams = S1:Toggle({ Title = "Chams", Value = false, Callback = function(v) Cfg.Chams = v end })
-UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = function(v) Cfg.Tracers = v end })
-UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
-UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
-UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
+UIRefs.ESP = S1:Toggle({ Title = "Enable Master ESP (Text/Boxes)", Value = false, Callback = function(v) Cfg.ESP = v end })
+UIRefs.Chams = S1:Toggle({ Title = "Enable Chams (Highlight)", Value = false, Callback = function(v) Cfg.Chams = v end })
+UIRefs.Tracers = S1:Toggle({ Title = "Enable Tracers (Lines)", Value = false, Callback = function(v) Cfg.Tracers = v end })
+UIRefs.Boxes = S1:Toggle({ Title = "Show 2D Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
+UIRefs.Names = S1:Toggle({ Title = "Show Name", Value = false, Callback = function(v) Cfg.Names = v end })
+UIRefs.Dist = S1:Toggle({ Title = "Show Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
 
-local S2 = T1:Section({ Title = "Filters" })
+local S2 = T1:Section({ Title = "Distance Filters" })
 
-UIRefs.MinD = S2:Slider({ Title = "Min Distance", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
-UIRefs.MaxD = S2:Slider({ Title = "Max Distance", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
+UIRefs.MinD = S2:Slider({ Title = "Min Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 0 }, Callback = function(v) Cfg.MinD = v end })
+UIRefs.MaxD = S2:Slider({ Title = "Max Distance (Studs)", Value = { Min = 0, Max = 5000, Default = 5000 }, Callback = function(v) Cfg.MaxD = v end })
 
 local S3 = T1:Section({ Title = "Colors & Sizes" })
 
-UIRefs.ColChams = S3:Colorpicker({ Title = "Chams Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
+UIRefs.ColChams = S3:Colorpicker({ Title = "Chams Fill Color", Default = Cfg.ColChams, Callback = function(c) Cfg.ColChams = c end })
+UIRefs.ColChamsOutline = S3:Colorpicker({ Title = "Chams Outline Color", Default = Cfg.ColChamsOutline, Callback = function(c) Cfg.ColChamsOutline = c end })
+UIRefs.ChamsOutlineTransparency = S3:Slider({ Title = "Chams Outline Transparency", Value = { Min = 0, Max = 1, Default = 0 }, Callback = function(v) Cfg.ChamsOutlineTransparency = v end })
+
 UIRefs.ColTracer = S3:Colorpicker({ Title = "Tracer Color", Default = Cfg.ColTracer, Callback = function(c) Cfg.ColTracer = c end })
 UIRefs.ColBox = S3:Colorpicker({ Title = "Box Color", Default = Cfg.ColBox, Callback = function(c) Cfg.ColBox = c end })
 UIRefs.ColText = S3:Colorpicker({ Title = "Text Color", Default = Cfg.ColText, Callback = function(c) Cfg.ColText = c end })
@@ -414,7 +445,7 @@ UIRefs.ThickBox = S3:Slider({ Title = "Box Thickness", Value = { Min = 1, Max = 
 UIRefs.SizeText = S3:Slider({ Title = "Text Size", Value = { Min = 1, Max = 50, Default = 14 }, Callback = function(v) Cfg.SizeText = v end })
 UIRefs.BoxScale = S3:Slider({ Title = "Box Scale", Value = { Min = 0.1, Max = 5, Default = 1 }, Callback = function(v) Cfg.BoxScale = v end })
 
-local S4 = T1:Section({ Title = "Rainbow" })
+local S4 = T1:Section({ Title = "Rainbow Effects" })
 
 UIRefs.RbwChams = S4:Toggle({ Title = "Rainbow Chams", Value = false, Callback = function(v) Cfg.RbwChams = v end })
 UIRefs.RbwTracers = S4:Toggle({ Title = "Rainbow Tracers", Value = false, Callback = function(v) Cfg.RbwTracers = v end })
@@ -424,7 +455,7 @@ UIRefs.RbwText = S4:Toggle({ Title = "Rainbow Text", Value = false, Callback = f
 local T2 = Win:Tab({ Title = "Configs", Icon = "save" })
 local S5 = T2:Section({ Title = "Config Manager" })
 
-local NameBox = S5:Input({ Title = "Config Name", Value = "default", Placeholder = "Name..." })
+local NameBox = S5:Input({ Title = "Config Name", Value = "default", Placeholder = "Enter name..." })
 
 S5:Button({
     Title = "Save Config",
@@ -453,7 +484,7 @@ S5:Button({
 })
 
 local autoloadStatus = S5:Paragraph({
-    Title = "Autoload",
+    Title = "Autoload Status",
     Desc = "Disabled"
 })
 
