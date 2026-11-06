@@ -14,7 +14,7 @@ local Cfg = {
     ColBox = Color3.fromRGB(170, 0, 255), ColText = Color3.fromRGB(220, 150, 255),
     ThickTracer = 1, ThickBox = 1, SizeText = 14,
     RbwChams = false, RbwTracers = false, RbwBoxes = false, RbwText = false,
-    AutoPhoto = false, ScanRate = 1
+    AutoPhoto = false, ScanRate = 1, ForceVisible = true
 }
 
 local Objs = {}
@@ -39,6 +39,7 @@ local function setup(obj)
     hl.FillTransparency = 0.5
     hl.OutlineColor = Cfg.ColChams
     hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Видно сквозь стены
     hl.Adornee = obj
     hl.Enabled = Cfg.Chams
     hl.Parent = obj
@@ -204,6 +205,18 @@ RunService.RenderStepped:Connect(function()
             continue
         end
 
+        -- ФОРСИРУЕМ ВИДИМОСТЬ (отключаем скрытие от игры)
+        if Cfg.ForceVisible then
+            for _, p in ipairs(obj:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.LocalTransparencyModifier = 0
+                    if p.Transparency > 0.5 then
+                        p.Transparency = 0.5
+                    end
+                end
+            end
+        end
+
         local sp, onScr = Camera:WorldToViewportPoint(root.Position)
         local dist = math.floor((hrp.Position - root.Position).Magnitude)
 
@@ -287,6 +300,7 @@ UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = functi
 UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
 UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
 UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
+UIRefs.ForceVisible = S1:Toggle({ Title = "Force Visibility (Bypass Hide)", Value = true, Callback = function(v) Cfg.ForceVisible = v end })
 
 local S2 = T1:Section({ Title = "Filters & Scan" })
 
