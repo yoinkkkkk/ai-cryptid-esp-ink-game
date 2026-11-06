@@ -280,11 +280,6 @@ local Win = WindUI:CreateWindow({
 })
 WinRef = Win
 
-track(UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.End then unloadScript() end
-end))
-
 local AUTOLOAD_FILE = "CryptidCfg/_autoload.txt"
 
 local function ensureDir()
@@ -354,11 +349,6 @@ UIRefs.Tracers = S1:Toggle({ Title = "Tracers", Value = false, Callback = functi
 UIRefs.Boxes = S1:Toggle({ Title = "Boxes", Value = false, Callback = function(v) Cfg.Boxes = v end })
 UIRefs.Names = S1:Toggle({ Title = "Names", Value = false, Callback = function(v) Cfg.Names = v end })
 UIRefs.Dist = S1:Toggle({ Title = "Distance", Value = false, Callback = function(v) Cfg.Dist = v end })
-
-S1:Button({
-    Title = "PANIC UNLOAD (or END key)",
-    Callback = function() unloadScript() end
-})
 
 local S2 = T1:Section({ Title = "Filters" })
 
